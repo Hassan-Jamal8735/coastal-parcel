@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigserial,
   bigint,
@@ -185,8 +186,9 @@ export const cities = pgTable(
     lat: numeric("lat", { precision: 10, scale: 7, mode: "number" }),
     lng: numeric("lng", { precision: 10, scale: 7, mode: "number" }),
   },
-  // Prefix search (city LIKE 'term%') filtered by country — the only query the autocomplete runs.
-  (t) => [index("cities_country_city_idx").on(t.country, t.city.op("text_pattern_ops"))],
+  // Case-insensitive prefix search (lower(city) LIKE 'term%') filtered by
+  // country — the only query the autocomplete runs.
+  (t) => [index("cities_country_city_lower_idx").on(t.country, sql`lower(${t.city}) text_pattern_ops`)],
 );
 
 // Admin-editable pricing rates (one row, key = "pricing"). Payment gateway
