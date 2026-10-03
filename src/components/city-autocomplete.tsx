@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 type Suggestion = { city: string; country: string; postalCode: string | null };
 
 /**
- * City input with live suggestions from /api/cities (filtered by the chosen
- * country). Picking a suggestion also fills the postal code; typing a city and
- * leaving the field still fills the postal code when there's an exact match.
+ * City input with live suggestions from /api/cities, filtered by the chosen
+ * country — same markup as the WordPress version (.cp-city-suggestions /
+ * .cp-city-suggestion) so the original CSS styles it. Picking a suggestion
+ * fills the postal code; typing a city and leaving the field also fills it
+ * when there's an exact match.
  */
 export function CityAutocomplete({
   name,
@@ -17,7 +19,7 @@ export function CityAutocomplete({
   onPostalCode,
   placeholder,
   required,
-  className,
+  className = "field w-input",
 }: {
   name?: string;
   country: string;
@@ -31,14 +33,10 @@ export function CityAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const picked = useRef("");
-  const blurTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     const term = value.trim();
-    if (term.length < 2 || term === picked.current) {
-      setSuggestions([]);
-      return;
-    }
+    if (term.length < 2 || term === picked.current) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       fetch(`/api/cities?term=${encodeURIComponent(term)}&country=${encodeURIComponent(country)}`, { signal: controller.signal })
@@ -63,46 +61,49 @@ export function CityAutocomplete({
   }
 
   function handleBlur() {
-    blurTimer.current = setTimeout(() => {
+    setTimeout(() => {
       setOpen(false);
-      const exact = suggestions.find((s) => s.city.toLowerCase() === value.trim().toLowerCase());
-      if (exact && value.trim() !== picked.current && exact.postalCode) onPostalCode?.(exact.postalCode);
+      const term = value.trim().toLowerCase();
+      const exact = suggestions.find((s) => s.city.toLowerCase() === term);
+      if (exact?.postalCode && value.trim() !== picked.current) onPostalCode?.(exact.postalCode);
     }, 150);
   }
 
   return (
-    <div className="relative">
+    <>
       <input
+        className={className}
+        type="text"
         name={name}
         value={value}
-        onChange={(e) => {
-          picked.current = "";
-          onChange(e.target.value);
-        }}
-        onFocus={() => suggestions.length && setOpen(true)}
-        onBlur={handleBlur}
         placeholder={placeholder}
         required={required}
         autoComplete="off"
-        className={className}
+        onChange={(e) => {
+          picked.current = "";
+          if (e.target.value.trim().length < 2) {
+            setSuggestions([]);
+            setOpen(false);
+          }
+          onChange(e.target.value);
+        }}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onBlur={handleBlur}
       />
-      {open && (
-        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-lg">
-          {suggestions.map((s, i) => (
-            <li key={`${s.city}-${s.postalCode}-${i}`}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(s)}
-                className="flex w-full justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-cream"
-              >
-                <span>{s.city}</span>
-                {s.postalCode && <span className="text-muted">{s.postalCode}</span>}
-              </button>
-            </li>
+      <div className={"cp-city-suggestions" + (open ? " is-open" : "")}>
+        {open &&
+          suggestions.map((s, i) => (
+            <div
+              key={`${s.city}-${s.postalCode}-${i}`}
+              className="cp-city-suggestion"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(s)}
+            >
+              {s.city}
+              {s.postalCode && <span className="cp-city-suggestion-postal">{s.postalCode}</span>}
+            </div>
           ))}
-        </ul>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

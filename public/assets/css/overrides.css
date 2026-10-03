@@ -1,0 +1,2287 @@
+/* Coastal Parcel — WordPress-specific overrides on top of the original Webflow stylesheet.
+   Keep this file minimal; only add rules here for things WordPress needs
+   that weren't part of the original site. */
+
+/* The minimal app header (template-parts/auth-header.php, used on login,
+   dashboards, /ship, /booking, /pay, backoffice, etc.) was position:static
+   in the original site, so it scrolled away with the page. The dashboard
+   sidebar is fixed and assumes the header always occupies the top 73px —
+   with a static header that assumption breaks the moment you scroll,
+   making the header disappear while the sidebar stays put. Fix: pin the
+   header too, and add matching top padding so content isn't hidden under it. */
+.navbar-3 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  /* webflow.css only ever set z-index:20 here, assuming a static
+     header that would never need to stack above anything — now that
+     it's pinned, that's far below Leaflet's own map panes/controls
+     (max ~1000, see assets/leaflet/leaflet.css), so any page with both
+     this header and a map (driver dashboard, backoffice, tracking)
+     would show the map scrolling on top of the header. */
+  z-index: 1500;
+}
+
+.full-wrapper {
+  padding-top: 73px;
+}
+
+/* Same fix as .navbar-3 above, for the public-site header (header.php) —
+   webflow.css has it position:fixed but z-index:9, far below Leaflet's
+   own map panes/controls (max ~1000), so the map on the public tracking
+   page (/track-shipment) would scroll on top of the header. */
+.navbar {
+  z-index: 1500;
+}
+
+/* Infinite scrolling brand logo strip (native Webflow site drives this via a
+   compiled interaction not present in the static export, so it's recreated
+   here as a straightforward CSS marquee — same visual result). */
+.brand-container {
+  width: max-content;
+  animation: cp-marquee 18s linear infinite;
+}
+
+@keyframes cp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.brand-container:hover {
+  animation-play-state: paused;
+}
+
+/* AJAX-nav loading indicator (assets/js/ajax-nav.js) — a thin bar at the
+   very top of the viewport, shown only while a swap is in flight, so
+   navigating still gives clear feedback without a full page reload. */
+/* AJAX-nav loading indicator — a centered spinner shown only while a
+   swap is in flight, rather than a thin bar pinned under the header
+   (which sat awkwardly close to the black navbar and looked like a
+   stray line more than a loading state). */
+#cp-nav-progress {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+#cp-nav-progress.is-active {
+  opacity: 1;
+  transition-delay: 0.15s; /* avoid a flash on requests that resolve almost instantly */
+}
+
+.cp-nav-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid #e7e2d8;
+  border-top-color: #f9b416;
+  animation: cp-nav-spin 0.7s linear infinite;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+@keyframes cp-nav-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Auth pages (login/register) — reuse the site's real .section_big /
+   .modal / .w-tabs markup and classes.
+   The original site animates a ".toggle" pill between tabs via Webflow's
+   proprietary JS engine, which we don't run here (see site.js). Without it,
+   the pill stays physically stuck in whichever tab it was coded into,
+   making the other tab's text invisible once you switch. Give the active
+   tab its background directly via CSS instead, and hide the static pill. */
+.tab-link.w--current {
+  background-color: #fff;
+  border-radius: 0;
+}
+
+.tab-link .toggle {
+  display: none;
+}
+
+.auth-error {
+  background: #fdecea;
+  border: 1px solid #f3b8b0;
+  color: #b3401f;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 13.5px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.auth-role-switch {
+  text-align: center;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 13.5px;
+  color: #6b6b6b;
+  margin: 20px 0 0;
+}
+
+.auth-role-switch a {
+  color: #1e1e1e;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.auth-role-switch a:hover {
+  color: #a17a00;
+}
+
+.auth-notice {
+  background: #fdf6e3;
+  border: 1px solid #f4e0a8;
+  color: #1e1e1e;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 14px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+/* ---- Dashboard shell (customer + driver) — new UI, sidebar layout.
+   Dashboards use the minimal .navbar-3 header (position:static, see
+   template-parts/auth-header.php), not the marketing site's fixed .navbar,
+   so no top-padding offset is needed here. ---- */
+.dashboard-shell {
+  font-family: 'Quicksand', sans-serif;
+  box-sizing: border-box;
+}
+
+.dashboard-sidebar {
+  /* Genuinely fixed to the viewport — it never moves, and never inherits
+     the page's scroll height, so it can't stretch/detach like a sticky
+     element would on a long page. .dashboard-main scrolls independently
+     underneath it (see margin-left there). */
+  position: fixed;
+  top: 73px;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  overflow-y: auto;
+  /* Higher than Leaflet's own panes/controls (max ~1000 — see
+     assets/leaflet/leaflet.css), so a map rendered further down the
+     page (driver dashboard location capture, tracking pages) can never
+     scroll over this fixed sidebar. */
+  z-index: 1500;
+  background: #1e1e1e;
+  color: #fff;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  /* If the nav list is ever taller than the screen, theme the scrollbar
+     to match instead of showing the browser's default light-gray one
+     against a dark sidebar. */
+  scrollbar-width: thin;
+  scrollbar-color: #444 #1e1e1e;
+}
+
+.dashboard-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+.dashboard-user {
+  padding: 0 24px 20px;
+  border-bottom: 1px solid #333;
+  margin-bottom: 8px;
+}
+
+.dashboard-user-name {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.dashboard-user-role {
+  font-size: 12.5px;
+  color: #b0b0b0;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.dashboard-nav-link {
+  display: block;
+  padding: 10px 24px;
+  color: #ccc;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  background: none;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  width: 100%;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.dashboard-nav-link:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.dashboard-nav-link.active {
+  background: #2a2a2a;
+  color: #f9b416;
+  border-left-color: #f9b416;
+}
+
+.dashboard-nav-divider {
+  height: 1px;
+  background: #333;
+  margin: 8px 24px;
+}
+
+/* Secondary/support links (Track, Schedule Pickup, Support, FAQ, etc.)
+   folded into the sidebar itself instead of a separate white bar above
+   it — one navigation source instead of two competing ones. Smaller and
+   muted so it reads as a lower-priority group under the main nav. */
+.dashboard-nav-secondary {
+  flex: 0 0 auto;
+}
+
+.dashboard-nav-secondary .dashboard-nav-link {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #999;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.dashboard-nav-secondary .dashboard-nav-link:hover {
+  color: #fff;
+  background: #2a2a2a;
+}
+
+.dashboard-nav-bottom {
+  padding: 16px 24px 0;
+  border-top: 1px solid #333;
+  margin-top: 16px;
+}
+
+.dashboard-nav-bottom a {
+  color: #ccc;
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: none;
+}
+
+.dashboard-nav-bottom a:hover {
+  color: #fff;
+}
+
+.dashboard-main {
+  margin-left: 260px;
+  min-height: calc(100vh - 73px);
+  padding: 48px;
+  background: #faf9f6;
+  box-sizing: border-box;
+  /* Defensive: a single long unbroken string anywhere inside (a payment
+     reference, a tracking note, etc.) could otherwise force this whole
+     column wider than available, dragging the fixed sidebar/header and
+     the rest of the layout into a page-wide horizontal scrollbar. */
+  overflow-x: hidden;
+}
+
+.dashboard-panel {
+  display: none;
+  max-width: 720px;
+}
+
+/* The backoffice portal needs real working width for tables and the
+   two-column shipment detail view — the 720px cap above was sized for
+   the customer/driver dashboard's narrow profile forms, not admin tools. */
+.dashboard-panel.bo-panel {
+  max-width: 1200px;
+}
+
+/* Same idea for "My Shipments" / "Assigned Shipments" — those shipment
+   cards include a two-column pickup/delivery breakdown that felt cramped
+   at the 720px width meant for simple Profile/Settings forms. */
+.dashboard-panel.wide-panel {
+  max-width: 900px;
+}
+
+.dashboard-panel.active {
+  display: block;
+}
+
+.dashboard-panel h2 {
+  margin-bottom: 8px;
+}
+
+.dashboard-panel-subtext {
+  color: #6b6b6b;
+  margin-bottom: 32px;
+}
+
+.dashboard-stat-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.dashboard-stat-card {
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 160px;
+}
+
+.dashboard-stat-value {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e1e1e;
+}
+
+.dashboard-stat-label {
+  color: #6b6b6b;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.dashboard-empty-state {
+  background: #fff;
+  border: 1px dashed #e7e2d8;
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  color: #6b6b6b;
+}
+
+.dashboard-form-field {
+  margin-bottom: 18px;
+}
+
+.dashboard-form-field label {
+  display: block;
+  font-weight: 600;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+}
+
+.dashboard-form-field input,
+.dashboard-form-field select {
+  width: 100%;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 15px;
+  padding: 12px 14px;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dashboard-form-field input:focus,
+.dashboard-form-field select:focus {
+  outline: none;
+  border-color: #f9b416;
+}
+
+.dashboard-success {
+  background: #eafaf1;
+  border: 1px solid #b7ebc9;
+  color: #1e7e42;
+  font-size: 13.5px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* Matches the header's own collapse-to-hamburger breakpoint (991px,
+   Webflow's data-collapse="medium" default) — the dashboard sidebar used
+   to only switch to its mobile layout at 767px, leaving a broken
+   768-991px range where the header was already mobile but the sidebar
+   was still a fixed 260px column overlapping the content beside it. */
+@media (max-width: 991px) {
+  .dashboard-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    bottom: auto;
+  }
+  .dashboard-nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .dashboard-nav-link {
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  .dashboard-nav-link.active {
+    border-left-color: transparent;
+    border-bottom-color: #f9b416;
+  }
+  .dashboard-main {
+    margin-left: 0;
+    padding: 24px;
+  }
+}
+
+/* ---- Create Shipment form (/ship) — Milestone 1. Reuses the site's real
+   .field / .form-field / .label input styling from the auth pages. ---- */
+.ship-form-section {
+  /* Lives inside .dashboard-main now (which already provides background
+     and padding) — this just keeps a little breathing room. */
+  padding-bottom: 20px;
+}
+
+.ship-form-card {
+  max-width: 720px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 16px;
+  padding: 48px;
+}
+
+.ship-section-heading {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 18px;
+  margin: 24px 0 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e7e2d8;
+}
+
+.ship-section-heading:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.form-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-row-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.ship-pricing-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1.5px solid #e7e2d8;
+}
+
+.ship-pricing-tab {
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #6b6b6b;
+  background: none;
+  border: none;
+  padding: 10px 4px 12px;
+  margin-right: 18px;
+  cursor: pointer;
+  position: relative;
+}
+
+.ship-pricing-tab.active {
+  color: #1e1e1e;
+}
+
+.ship-pricing-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.5px;
+  height: 3px;
+  background: #f9b416;
+  border-radius: 3px 3px 0 0;
+}
+
+.ship-pricing-panel {
+  display: none;
+}
+
+.ship-pricing-panel.active {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .ship-form-card {
+    padding: 28px 20px;
+  }
+  .form-row-2col,
+  .form-row-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Shipment list (dashboard "My Shipments" / "Assigned Shipments") ---- */
+.shipment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shipment-card {
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.shipment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.shipment-status-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #f4f1ea;
+  color: #6b6b6b;
+}
+
+.shipment-status-badge.status-draft { background: #eef1f4; color: #4a5a6b; }
+.shipment-status-badge.status-confirmed,
+.shipment-status-badge.status-paid { background: #eafaf1; color: #1e7e42; }
+.shipment-status-badge.status-assigned,
+.shipment-status-badge.status-picked_up,
+.shipment-status-badge.status-in_transit,
+.shipment-status-badge.status-out_for_delivery { background: #fdf6e3; color: #a17a00; }
+.shipment-status-badge.status-delivered { background: #eafaf1; color: #1e7e42; }
+.shipment-status-badge.status-cancelled,
+.shipment-status-badge.status-failed,
+.shipment-status-badge.status-returned { background: #fdecea; color: #b3401f; }
+
+.shipment-date {
+  font-size: 13px;
+  color: #999;
+}
+
+.shipment-route {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.shipment-meta {
+  font-size: 13.5px;
+  color: #6b6b6b;
+  margin: 0;
+}
+
+.shipment-note {
+  font-size: 13px;
+  color: #a17a00;
+  background: #fdf6e3;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 12px 0 0;
+}
+
+.shipment-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.shipment-tracking-number {
+  font-family: 'Inconsolata', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  background: #f4f1ea;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.tracking-number-display {
+  font-family: 'Inconsolata', monospace;
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: 0.05em;
+  background: #fdf6e3;
+  border: 1px solid #f4e0a8;
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: inline-block;
+  margin: 16px 0;
+}
+
+/* ---- Internal "Track a Shipment" search bar (/track-shipment, logged-in customers) ---- */
+.track-search-form {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 560px;
+  margin: 20px 0 30px;
+}
+
+.track-search-input {
+  flex: 1;
+  height: 52px;
+  padding: 0 18px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 15px;
+  color: #1c1c1c;
+  background: #fff;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 10px;
+  box-sizing: border-box;
+  transition: border-color .2s;
+}
+
+.track-search-input:focus {
+  outline: none;
+  border-color: #f9b416;
+}
+
+.track-search-submit {
+  height: 52px;
+  padding: 0 32px;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #1c1c1c;
+  background: #f9b416;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.track-search-submit:hover {
+  background: #e0a30f;
+}
+
+@media (max-width: 500px) {
+  .track-search-form {
+    flex-direction: column;
+  }
+  .track-search-submit {
+    width: 100%;
+  }
+}
+
+/* ---- Public tracking timeline (/track-shipment) ---- */
+.tracking-result {
+  max-width: 640px;
+  margin: 0 auto 40px;
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.tracking-timeline {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+}
+
+.tracking-timeline li {
+  position: relative;
+  padding: 0 0 24px 28px;
+  border-left: 2px solid #e7e2d8;
+}
+
+.tracking-timeline li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.tracking-timeline li::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f9b416;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #f9b416;
+}
+
+.tracking-timeline .tt-status {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.tracking-timeline .tt-note {
+  font-size: 13.5px;
+  color: #6b6b6b;
+  margin: 4px 0 0;
+}
+
+.tracking-timeline .tt-date {
+  font-size: 12px;
+  color: #999;
+  margin: 2px 0 0;
+}
+
+/* ---- Live driver location (map marker + note above it) ---- */
+.cp-live-location-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c6fd9;
+  margin: 16px 0 0;
+}
+
+.cp-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #1c6fd9;
+  box-shadow: 0 0 0 rgba(28, 111, 217, 0.5);
+  animation: cp-live-pulse 1.8s infinite;
+  flex-shrink: 0;
+}
+
+.cp-live-marker-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1c6fd9;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #1c6fd9;
+}
+
+@keyframes cp-live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(28, 111, 217, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(28, 111, 217, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(28, 111, 217, 0); }
+}
+
+/* ---- Driver status update form (driver dashboard shipment cards) ---- */
+.driver-status-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e7e2d8;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.driver-status-form textarea {
+  flex: 1;
+  min-width: 200px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border: 1px solid #e7e2d8;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 38px;
+}
+
+.driver-photo-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: #6b6b6b;
+}
+
+.shipment-photos {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.shipment-photos a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.shipment-photos img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e7e2d8;
+}
+
+.shipment-pickup-delivery {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: #faf9f6;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+
+.shipment-pd-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #a17a00;
+  margin: 0 0 4px;
+}
+
+.whatsapp-contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e7e42;
+  text-decoration: none;
+  background: #eafaf1;
+  border: 1px solid #b7ebc9;
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.whatsapp-contact-link::before {
+  content: "\1F4AC";
+}
+
+.whatsapp-contact-link:hover {
+  background: #d9f5e3;
+}
+
+/* ---- Payment gateway selector (/pay, when both Paystack + Stripe configured) ---- */
+.gateway-choice {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.gateway-choice-option {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 10px;
+  padding: 16px 18px;
+  cursor: pointer;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.gateway-choice-option:has(input:checked) {
+  border-color: #f9b416;
+  background: #fff8ea;
+}
+
+.gateway-choice-option input[type="radio"] {
+  width: auto;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+}
+
+.pay-gateway-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-price-display {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.cp-secondary-btn {
+  background-color: #2b2b2b;
+}
+
+.cp-estimate-box {
+  background: #f4f1ea;
+  border: 1px solid #e7e2d8;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 4px 0 16px;
+}
+
+.cp-estimate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.cp-estimate-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b6b6b;
+  margin: 0;
+}
+
+.cp-estimate-currency {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1c1c1c;
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.cp-estimate-value {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.cp-estimate-meta {
+  font-size: 12.5px;
+  color: #6b6b6b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cp-estimate-error {
+  color: #b3401f;
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.shipment-note-form {
+  margin-top: 10px;
+}
+
+.shipment-note-form textarea {
+  width: 100%;
+  min-height: 60px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 13.5px;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.shipment-note-form .cp-note-submit {
+  font-size: 12.5px;
+  padding: 6px 14px;
+}
+
+@media (max-width: 500px) {
+  .shipment-pickup-delivery {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Backoffice portal (/backoffice) ---- */
+.bo-card {
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.bo-card h3 {
+  margin-top: 0;
+}
+
+.bo-card p {
+  /* A payment reference (Stripe session IDs are 60+ characters with no
+     spaces/hyphens to wrap on) or a long tracking note would otherwise
+     force this single "word" wider than the card, pushing the whole
+     backoffice layout into horizontal overflow — visible as a page-wide
+     scrollbar and everything looking oddly stretched/cramped. */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.bo-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.bo-col-side {
+  position: sticky;
+  top: 20px;
+}
+
+.bo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.bo-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #faf9f6;
+  border-bottom: 2px solid #e7e2d8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b6b6b;
+}
+
+.bo-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0ede4;
+  vertical-align: middle;
+  overflow-wrap: break-word;
+}
+
+.bo-table tr:hover td {
+  background: #faf9f6;
+}
+
+.bo-table a,
+.bo-card a,
+.dashboard-main > p a {
+  color: #1e1e1e;
+  text-decoration: underline;
+  text-decoration-color: #d8d2c4;
+  text-underline-offset: 2px;
+}
+
+.bo-table a:hover,
+.bo-card a:hover,
+.dashboard-main > p a:hover {
+  color: #a17a00;
+  text-decoration-color: #a17a00;
+}
+
+@media (max-width: 900px) {
+  .bo-grid {
+    grid-template-columns: 1fr;
+  }
+  .bo-col-side {
+    position: static;
+  }
+  .bo-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* ---- Show/hide password toggle (injected by site.js on every
+   input[type=password] site-wide) ---- */
+.cp-password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.cp-password-wrapper input {
+  width: 100%;
+  padding-right: 56px !important;
+  box-sizing: border-box;
+}
+
+.cp-password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b6b6b;
+  cursor: pointer;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cp-password-toggle:hover {
+  color: #1e1e1e;
+}
+
+/* ==========================================================================
+   ShipNow wizard — sub-nav, stepper, and the /ship-now quote calculator.
+   Uses the same brand palette as the rest of the site (yellow #f9b416 /
+   dark ink #1c1c1c) rather than borrowing DHL's own colors, so the flow
+   stays visually consistent with the rest of Coastal Parcel.
+   ========================================================================== */
+
+.shipnow-subnav {
+  background: #fff;
+  border-bottom: 1px solid #e7e2d8;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.shipnow-subnav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Login/Sign up/My Account, in the black top bar next to "Visit Site"
+   (see template-parts/auth-header.php) — needs a light-on-dark variant
+   since .shipnow-btn-outline assumes a white surface underneath it. */
+.auth-header-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 16px;
+}
+
+/* The internal app header (auth-header.php) reuses Webflow's .w-nav /
+   .w-nav-button / .w-nav-menu markup, and site.js's generic mobile-nav
+   toggle already handles the click (adds/removes [data-nav-menu-open])
+   — but there was never any CSS actually hiding .navbar-menu at narrow
+   widths, so the hamburger button did nothing and the nav (About/
+   Services/Contact/Ship dropdown/My Account/Visit Site) just wrapped
+   onto a second line, tall enough to overlap the sidebar/content below
+   it. Give it a real collapsed state, matching the public header's own
+   991px breakpoint. */
+@media (max-width: 991px) {
+  .navbar-container-2 {
+    position: relative;
+    flex-wrap: wrap;
+  }
+  /* webflow.css sets .hamburger { display:none } unconditionally, with
+     no breakpoint anywhere that ever turns it back on — it was
+     permanently dead. Actually show it here so there's a way to open
+     the nav we're now collapsing. */
+  .navbar-3 .hamburger {
+    display: block;
+    cursor: pointer;
+  }
+  /* webflow.css's .hamburger_line-* rules use a black background-color —
+     invisible against this navbar's dark background. Those rules only
+     ever applied inside media queries seemingly meant for a light-
+     background nav variant elsewhere; override to white here. */
+  .navbar-3 .hamburger_line-top,
+  .navbar-3 .hamburger_line-middle,
+  .navbar-3 .hamburger_line-bottom {
+    background-color: #fff;
+  }
+  .navbar-3 .navbar-menu {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #1e1e1e;
+    padding: 20px 24px;
+    z-index: 30;
+  }
+  .navbar-3 .navbar-menu[data-nav-menu-open] {
+    display: flex;
+  }
+  .auth-header-links,
+  .auth-header-account {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-right: 0;
+  }
+  .nav-ship-dropdown-menu {
+    position: static;
+    box-shadow: none;
+    border: none;
+    padding: 0 0 0 12px;
+    margin-top: 8px;
+  }
+}
+
+/* Main marketing nav links (About/Services/Contact/Ship), reused inside
+   the internal app header (auth-header.php) so guest-facing pages like
+   /ship-now never strand visitors without a way to navigate. */
+.auth-header-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-right: 24px;
+}
+
+/* ---- "Ship" nav dropdown (Get a Quote / Track a Shipment / My Shipments),
+   shared between the public header and the internal app header. ---- */
+.nav-ship-dropdown {
+  position: relative;
+}
+
+.nav-ship-dropdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.nav-ship-dropdown-caret {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.nav-ship-dropdown.is-open .nav-ship-dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.nav-ship-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 0;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  z-index: 500;
+}
+
+.nav-ship-dropdown.is-open .nav-ship-dropdown-menu {
+  display: block;
+}
+
+.nav-ship-dropdown-menu a {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1c1c;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-ship-dropdown-menu a:hover {
+  background: #f4f1ea;
+}
+
+.shipnow-btn-outline-inverse {
+  display: inline-block;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  padding: 9px 18px;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.shipnow-btn-outline-inverse:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.shipnow-subnav-links {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.shipnow-subnav-link {
+  display: inline-block;
+  padding: 16px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a4a4a;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.shipnow-subnav-link:hover {
+  color: #1c1c1c;
+}
+
+.shipnow-subnav-link.active {
+  color: #1c1c1c;
+  border-bottom-color: #f9b416;
+}
+
+.shipnow-subnav-inner {
+  min-height: 62px;
+}
+
+.shipnow-btn {
+  display: inline-block;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.2;
+  padding: 9px 18px;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  text-align: center;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.shipnow-btn-outline {
+  background: #fff;
+  border-color: #1c1c1c;
+  color: #1c1c1c;
+}
+
+.shipnow-btn-outline:hover {
+  background: #f4f1ea;
+}
+
+.shipnow-btn-solid {
+  background: #f9b416;
+  color: #1c1c1c;
+}
+
+.shipnow-btn-solid:hover {
+  background: #d7990c;
+}
+
+/* Stepper */
+.shipnow-stepper {
+  display: flex;
+  align-items: center;
+  max-width: 260px;
+  margin: 0 0 24px;
+}
+
+.shipnow-step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e7e2d8;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+}
+
+.shipnow-step-dot.is-current {
+  background: #1c1c1c;
+}
+
+.shipnow-step-dot.is-done {
+  background: #f9b416;
+}
+
+.shipnow-step-line {
+  flex: 1;
+  height: 2px;
+  background: #e7e2d8;
+  margin: 0 4px;
+}
+
+/* Quote calculator page */
+.shipnow-page {
+  background: #faf9f6;
+  min-height: calc(100vh - 125px);
+  padding: 48px 24px 80px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.shipnow-container {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.shipnow-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1c1c1c;
+  margin: 0 0 8px;
+}
+
+.shipnow-subtitle {
+  font-size: 15px;
+  color: #6b6b6b;
+  margin: 0 0 28px;
+}
+
+.shipnow-card {
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 20px;
+}
+
+.shipnow-shipper-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  border-bottom: 1.5px solid #e7e2d8;
+}
+
+.shipnow-shipper-tab {
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #6b6b6b;
+  background: none;
+  border: none;
+  padding: 10px 4px 12px;
+  margin-right: 20px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.shipnow-shipper-tab.active {
+  color: #1c1c1c;
+  border-bottom-color: #f9b416;
+}
+
+.shipnow-block-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b6b6b;
+  margin: 0 0 14px;
+}
+
+.shipnow-from-to {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.shipnow-location-block:only-child {
+  grid-column: 1 / -1;
+}
+
+.cp-city-autocomplete-wrap {
+  position: relative;
+}
+
+.cp-city-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: #fff;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  display: none;
+}
+
+.cp-city-suggestions.is-open {
+  display: block;
+}
+
+.cp-city-suggestion {
+  padding: 10px 14px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 13.5px;
+  color: #1c1c1c;
+  cursor: pointer;
+  border-bottom: 1px solid #f4f1ea;
+}
+
+.cp-city-suggestion:last-child {
+  border-bottom: none;
+}
+
+.cp-city-suggestion:hover,
+.cp-city-suggestion.is-active {
+  background: #fdf6e3;
+}
+
+.cp-city-suggestion .cp-city-suggestion-postal {
+  color: #6b6b6b;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.shipnow-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #4a4a4a;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.shipnow-checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.shipnow-item-card {
+  margin-top: 4px;
+}
+
+.shipnow-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shipnow-qty-stepper input {
+  text-align: center;
+}
+
+.shipnow-qty-btn {
+  width: 36px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1.5px solid #e7e2d8;
+  background: #fbfaf7;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #1c1c1c;
+}
+
+.shipnow-qty-btn:hover {
+  background: #f4f1ea;
+}
+
+.shipnow-preset-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4a4a;
+  margin: 16px 0 10px;
+}
+
+.shipnow-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+/* ---- Multiple packages per shipment (/ship "Packaging" section) ---- */
+.cp-package-row {
+  border: 1.5px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 18px 20px 4px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.cp-package-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.cp-package-row-header h4 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 15px;
+  margin: 0;
+}
+
+.cp-package-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid #e7e2d8;
+  background: #fff;
+  color: #b3401f;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-package-remove:hover {
+  background: #fdecea;
+  border-color: #f3b8ab;
+}
+
+.cp-packages-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1c1c;
+  background: #fbfaf7;
+  border: 1px solid #e7e2d8;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-top: 8px;
+}
+
+.shipnow-preset-btn {
+  font-family: 'Quicksand', sans-serif;
+  background: #fbfaf7;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 10px;
+  padding: 12px 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1c1c1c;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+
+.shipnow-preset-dims {
+  font-weight: 500;
+  color: #6b6b6b;
+  font-size: 11px;
+}
+
+.shipnow-preset-icon {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 40px;
+  margin-bottom: 2px;
+}
+
+.shipnow-preset-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.shipnow-preset-btn:hover {
+  border-color: #f9b416;
+}
+
+.shipnow-preset-btn.active {
+  border-color: #f9b416;
+  background: #fdf6e3;
+}
+
+.shipnow-get-quote {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 15.5px;
+  border-radius: 10px;
+}
+
+.shipnow-error {
+  color: #b3401f;
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+.shipnow-results-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1c1c1c;
+  margin: 8px 0 16px;
+}
+
+.shipnow-quote-option {
+  background: #fff;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 14px;
+}
+
+.shipnow-quote-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.shipnow-quote-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.shipnow-badge-green {
+  background: #2f8f4e;
+}
+
+.shipnow-badge-blue {
+  background: #2f6ea8;
+}
+
+.shipnow-quote-price {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1c1c1c;
+}
+
+.shipnow-quote-meta {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin: 0 0 14px;
+}
+
+.shipnow-quote-option .shipnow-btn {
+  width: 100%;
+}
+
+.shipnow-quote-actions {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0 14px;
+  flex-wrap: wrap;
+}
+
+.shipnow-quote-disclaimer {
+  font-size: 12px;
+  color: #9a9a9a;
+  margin: 0;
+}
+
+.pay-charges-card {
+  background: #fdf6e3;
+  border: 1px solid #f4e0a8;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 8px 0 24px;
+}
+
+.pay-charges-title {
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b6b6b;
+  margin: 0 0 12px;
+}
+
+.pay-charges-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.pay-charges-table td {
+  padding: 6px 0;
+  font-size: 14.5px;
+  color: #1c1c1c;
+}
+
+.pay-charges-table td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+.pay-charges-total td {
+  border-top: 1.5px solid #f4e0a8;
+  padding-top: 12px;
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+/* Gateway badges — Stripe uses its real self-hosted logo mark
+   (assets/img/brands/stripe.svg); Paystack has no safe-to-self-host
+   logo asset available, so it gets a brand-accurate styled wordmark
+   (their real cyan, #00C3F7) instead. */
+.pay-gateway-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  color: #fff;
+  /* Its parent (.pay-gateway-info) is a column flexbox, which stretches
+     children to its full cross-axis width by default — barely visible
+     on the longer "Paystack" label but very visible as a long empty
+     purple bar on the shorter "Stripe" one. Size to content instead. */
+  align-self: flex-start;
+}
+
+.pay-gateway-logo {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.pay-gateway-paystack {
+  background: #00c3f7;
+  color: #011b33;
+}
+
+.pay-gateway-stripe {
+  background: #635bff;
+}
+
+.pay-gateway-desc {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b6b6b;
+}
+
+.pay-gateway-powered {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin: 4px 0 16px;
+}
+
+.pay-disclosure {
+  font-size: 12.5px;
+  color: #6b6b6b;
+  margin: 16px 0;
+  line-height: 1.6;
+}
+
+.pay-disclosure p {
+  margin: 0 0 8px;
+}
+
+.pay-terms-row {
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.pay-terms-row a {
+  color: #1c1c1c;
+  font-weight: 700;
+}
+
+/* .button-2's width:100%/height:45px (webflow.css) only ever worked on
+   the <input type="submit"> it was designed for — on an <a> tag (inline
+   by default) those are silently ignored, rendering as a cramped,
+   unstyled-looking box. Several pages reuse .button-2 on real links
+   ("Try Again", "Track This Shipment", the outline "Back" buttons), so
+   fix it for every anchor use, not just the one variant that got
+   reported first. */
+a.button-2 {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* Outline pairing for the site's real .button-2 (used as "Back"/"Cancel"
+   next to a primary .button-2 "Continue" on every wizard step), so the
+   whole flow shares one consistent button system instead of a second
+   competing style. */
+.button-2.outline {
+  background-color: transparent;
+  color: #1c1c1c;
+  border: 2px solid #1c1c1c;
+  box-sizing: border-box;
+}
+
+.button-2.outline:hover {
+  background-color: #1c1c1c;
+  color: #fff;
+}
+
+.ship-wizard-actions .button-2 {
+  width: auto;
+  padding: 0 28px;
+}
+
+.ship-options-edit-link {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.shipnow-service-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.shipnow-service-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.shipnow-service-option:has(input:checked) {
+  border-color: #f9b416;
+  background: #fdf6e3;
+}
+
+.shipnow-service-option input {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.shipnow-service-option-body {
+  flex: 1;
+}
+
+.shipnow-service-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shipnow-service-option-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1c1c1c;
+}
+
+.shipnow-service-option-price {
+  font-weight: 700;
+  font-size: 17px;
+  color: #1c1c1c;
+}
+
+.shipnow-service-option-meta {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin: 4px 0 0;
+}
+
+.shipnow-rate-note {
+  font-size: 12px;
+  color: #9a9a9a;
+  margin: 0 0 20px;
+}
+
+.shipnow-addon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.shipnow-addon-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.shipnow-addon-option:has(input:checked) {
+  border-color: #f9b416;
+  background: #fdf6e3;
+}
+
+.shipnow-addon-option input {
+  width: auto;
+  margin: 4px 0 0;
+  flex-shrink: 0;
+}
+
+.shipnow-addon-option-body {
+  /* Without this, the body shrink-wraps to its own content width (its
+     parent is display:flex with no flex-basis set), leaving the header's
+     justify-content:space-between almost no room to work with — so the
+     price ends up sitting right next to the label instead of flush to
+     the card's right edge, at a different spot on every row depending on
+     the label's length. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.shipnow-addon-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shipnow-addon-option-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1c1c1c;
+}
+
+.shipnow-addon-option-price {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1c1c1c;
+}
+
+.shipnow-addon-option-desc {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin: 4px 0 0;
+}
+
+.ship-wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.ship-doc-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 44px;
+}
+
+.ship-doc-toggle-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b6b6b;
+  cursor: pointer;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 8px;
+  padding: 0 16px;
+  height: 44px;
+  background: #fff;
+}
+
+.ship-doc-toggle-option:has(input:checked) {
+  border-color: #1c1c1c;
+  color: #1c1c1c;
+  background: #fdf6e3;
+}
+
+.ship-doc-toggle-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ship-doc-toggle-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #c8c2b3;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.ship-doc-toggle-option:has(input:checked) .ship-doc-toggle-check {
+  border-color: #2f8f4e;
+}
+
+.ship-doc-toggle-option:has(input:checked) .ship-doc-toggle-check::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2f8f4e;
+  transform: translate(-50%, -50%);
+}
+
+/* Boxed, icon-led section cards — replaces the old plain heading +
+   top-border-line divider style (which read as a stray floating line on
+   shorter sections) with a clearly separated card per section, matching
+   the rest of the ShipNow wizard's visual language. */
+.ship-card-section {
+  background: #fbfaf7;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 14px;
+  padding: 24px 26px;
+  margin-bottom: 22px;
+  /* The form itself uses Webflow's .form-2 (flex, align-items:flex-start),
+     which shrink-wraps a flex child to its content width — fine for
+     sections with a wide grid of fields, but it left sparser ones (like
+     "Notes") narrow with a large empty gap beside them. Force full width
+     regardless of content so every section card is visually consistent. */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ship-card-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ship-card-section-header h3 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 18px;
+  margin: 0;
+}
+
+.ship-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1.5px solid #e7e2d8;
+  border-radius: 8px;
+}
+
+.ship-card-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.ship-prohibited-details {
+  margin: 12px 0 20px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.ship-prohibited-details summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1c1c1c;
+  text-decoration: underline;
+}
+
+.ship-prohibited-list {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13.5px;
+  color: #6b6b6b;
+  line-height: 1.7;
+}
+
+@media (max-width: 700px) {
+  .shipnow-subnav-inner {
+    justify-content: center;
+  }
+  .shipnow-from-to {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .shipnow-preset-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .shipnow-title {
+    font-size: 26px;
+  }
+  .shipnow-card {
+    padding: 20px;
+  }
+  .shipnow-quote-actions {
+    flex-direction: column;
+  }
+  .shipnow-quote-actions .shipnow-btn {
+    width: 100%;
+  }
+
+  /* Shipping Options / Optional Services / Payment cards — stack price
+     next to the label instead of forcing them apart on narrow screens. */
+  .shipnow-service-option-header,
+  .shipnow-addon-option-header {
+    flex-wrap: wrap;
+  }
+  .shipnow-service-option,
+  .shipnow-addon-option {
+    padding: 14px 16px;
+  }
+
+  /* Back/Continue buttons — full-width and stacked instead of squeezed
+     side by side. */
+  .ship-wizard-actions {
+    flex-direction: column-reverse;
+  }
+  .ship-wizard-actions .shipnow-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Payment itemized table — smaller type so long service/addon labels
+     don't force horizontal scroll. */
+  .pay-charges-card {
+    padding: 16px 18px;
+  }
+  .pay-charges-table td {
+    font-size: 13.5px;
+  }
+
+  /* Customs invoice signature/logo uploads — one per row instead of
+     cramped side by side. */
+  #cp-dimensions-block.form-row-3col,
+  .form-row-3col {
+    grid-template-columns: 1fr;
+  }
+}

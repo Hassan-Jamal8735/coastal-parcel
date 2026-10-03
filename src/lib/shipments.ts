@@ -75,7 +75,7 @@ export async function getShipment(id: number) {
 export async function requireAccessibleShipment(id: number) {
   const shipment = await getShipment(id);
   if (!(await canAccessShipment(shipment))) {
-    if (shipment && !shipment.customerId) redirect("/login?notice=guest_session_lost");
+    if (shipment && !shipment.customerId) redirect("/user-account-creation?tab=login&notice=guest_session_lost");
     redirect("/dashboard");
   }
   return shipment!;
@@ -123,9 +123,9 @@ export async function addTrackingEvent(
 /** Where a draft should resume, given how far through the wizard it got. */
 export function nextStepFor(s: Shipment) {
   if (s.status === "draft") {
-    if (!s.serviceType) return `/ship/${s.id}/options`;
-    return `/ship/${s.id}/review`;
+    if (!s.serviceType) return `/shipping-options?shipment_id=${s.id}`;
+    return `/booking?shipment_id=${s.id}`;
   }
-  if (s.status === "confirmed") return `/ship/${s.id}/pay`;
-  return `/ship/${s.id}/confirmed`;
+  if (s.status === "confirmed") return `/pay?shipment_id=${s.id}`;
+  return `/booking-confirmed?shipment_id=${s.id}`;
 }

@@ -87,7 +87,7 @@ export function deliveryEstimate(serviceType: string, isDomestic: boolean) {
 // ---- Currency ----
 
 /** Units of each currency per 1 NGN, refreshed at most hourly. */
-async function ngnRates(): Promise<Record<string, number>> {
+export async function ngnRates(): Promise<Record<string, number>> {
   try {
     const res = await fetch("https://open.er-api.com/v6/latest/NGN", { next: { revalidate: 3600 } });
     const data = await res.json();

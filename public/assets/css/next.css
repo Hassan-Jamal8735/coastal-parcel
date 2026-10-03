@@ -1,0 +1,18 @@
+/* Small additions on top of the original theme CSS (webflow.css +
+   overrides.css), only for things that worked differently in WordPress. */
+
+/* Log Out is a form button here (a POST server action, so it can't be
+   triggered by a stray link) — style it exactly like the sidebar links. */
+.cp-link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  color: #ccc;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.cp-link-button:hover {
+  color: #fff;
+}

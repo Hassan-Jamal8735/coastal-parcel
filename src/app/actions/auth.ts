@@ -12,25 +12,30 @@ import { createSession, deleteSession } from "@/lib/session";
 export type AuthFormState = { error?: string } | undefined;
 
 const loginSchema = z.object({
-  email: z.email("Please enter a valid email.").trim().toLowerCase(),
-  password: z.string().min(1, "Please enter your password."),
+  email: z.email("Please enter a valid email address.").trim().toLowerCase(),
+  password: z.string().min(1, "Please enter your email and password."),
 });
 
 const signupSchema = z.object({
-  name: z.string().trim().min(2, "Please enter your full name."),
-  email: z.email("Please enter a valid email.").trim().toLowerCase(),
-  phone: z.string().trim().min(5, "Please enter your phone number."),
+  full_name: z.string().trim().min(1, "Please fill in all fields."),
+  email: z.email("Please enter a valid email address.").trim().toLowerCase(),
+  phone: z.string().trim().min(1, "Please fill in all fields."),
   password: z.string().min(8, "Password must be at least 8 characters."),
 });
 
 const driverSignupSchema = signupSchema.extend({
-  vehicleType: z.string().trim().min(2, "Please choose your vehicle type."),
+  vehicle_type: z.enum(["motorcycle", "car", "van", "truck"], "Please fill in all fields."),
 });
 
 /** Only same-site relative paths — never redirect a user to another domain after login. */
-function safeNext(value: FormDataEntryValue | null) {
+function safeRedirect(value: FormDataEntryValue | null) {
   const next = typeof value === "string" ? value : "";
   return next.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
+async function emailTaken(email: string) {
+  const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+  return rows.length > 0;
 }
 
 export async function login(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -44,20 +49,20 @@ export async function login(_: AuthFormState, formData: FormData): Promise<AuthF
   }
 
   await createSession(user.id, user.role);
-  redirect(safeNext(formData.get("next")) ?? homeFor(user.role));
+  // Staff/drivers always go to their own area; customers may continue where they left off.
+  const target = user.role === "customer" ? safeRedirect(formData.get("redirect_to")) : null;
+  redirect(target ?? homeFor(user.role));
 }
 
 export async function signupCustomer(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.data.email)).limit(1);
-  if (existing.length) return { error: "An account with this email already exists." };
+  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists." };
 
   const [user] = await db
     .insert(users)
     .values({
-      name: parsed.data.name,
+      name: parsed.data.full_name,
       email: parsed.data.email,
       phone: parsed.data.phone,
       passwordHash: await bcrypt.hash(parsed.data.password, 10),
@@ -66,25 +71,23 @@ export async function signupCustomer(_: AuthFormState, formData: FormData): Prom
     .returning({ id: users.id });
 
   await createSession(user.id, "customer");
-  redirect(safeNext(formData.get("next")) ?? "/dashboard");
+  redirect(safeRedirect(formData.get("redirect_to")) ?? "/dashboard");
 }
 
 export async function signupDriver(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = driverSignupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists." };
 
-  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.data.email)).limit(1);
-  if (existing.length) return { error: "An account with this email already exists." };
-
-  // New drivers start "pending" — staff approve them in the backoffice before
-  // they can be assigned shipments.
+  // New drivers start "pending" — staff approve them in the backoffice
+  // before they can be assigned shipments.
   const [user] = await db
     .insert(users)
     .values({
-      name: parsed.data.name,
+      name: parsed.data.full_name,
       email: parsed.data.email,
       phone: parsed.data.phone,
-      vehicleType: parsed.data.vehicleType,
+      vehicleType: parsed.data.vehicle_type,
       passwordHash: await bcrypt.hash(parsed.data.password, 10),
       role: "driver",
       driverStatus: "pending",
@@ -92,7 +95,7 @@ export async function signupDriver(_: AuthFormState, formData: FormData): Promis
     .returning({ id: users.id });
 
   await createSession(user.id, "driver");
-  redirect("/driver");
+  redirect("/driver-dashboard");
 }
 
 export async function logout() {

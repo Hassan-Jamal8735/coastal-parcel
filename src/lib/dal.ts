@@ -8,7 +8,7 @@ import { readSession, type Role } from "./session";
 
 /** Home page for each role — where login lands, and where a wrong-role visitor is sent. */
 export function homeFor(role: Role) {
-  if (role === "driver") return "/driver";
+  if (role === "driver") return "/driver-dashboard";
   if (role === "staff" || role === "admin") return "/backoffice";
   return "/dashboard";
 }
@@ -40,7 +40,7 @@ export const getCurrentUser = cache(async () => {
  */
 export async function requireRole(...allowed: Role[]) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/user-account-creation?tab=login");
   if (!allowed.includes(user.role)) redirect(homeFor(user.role));
   return user;
 }

@@ -1,39 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
-import { BOX_PRESETS, COUNTRIES } from "@/lib/constants";
-import { cardClass, CountryOptions, Field, inputClass, outlineButton, primaryButton } from "@/components/ui";
+import { COUNTRIES } from "@/lib/constants";
 
 type Quote = { displayAmount: number; currencySymbol: string; distanceKm: number; route: string; error?: string };
 type Loc = { country: string; city: string; postal: string };
 
 function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc: Loc; setLoc: React.Dispatch<React.SetStateAction<Loc>>; placeholder: string }) {
   return (
-    <div className="space-y-4">
-      <p className="text-xs font-bold uppercase tracking-wider text-muted">{label}</p>
-      <Field label="Country">
-        <select className={inputClass} value={loc.country} onChange={(e) => setLoc({ country: e.target.value, city: "", postal: "" })}>
-          {!loc.country && <option value="" disabled>Select country</option>}
-          <CountryOptions countries={COUNTRIES} />
+    <div className="shipnow-location-block">
+      <p className="shipnow-block-label">{label}</p>
+      <div className="form-field">
+        <div className="label">Country</div>
+        <select className="field w-select" value={loc.country} onChange={(e) => setLoc({ country: e.target.value, city: "", postal: "" })}>
+          {label === "To" && (
+            <option value="" disabled>
+              Select country
+            </option>
+          )}
+          {COUNTRIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="City">
+      </div>
+      <div className="form-row-2col">
+        <div className="form-field cp-city-autocomplete-wrap">
+          <div className="label">City</div>
           <CityAutocomplete
             country={loc.country}
             value={loc.city}
+            placeholder={placeholder}
             onChange={(city) => setLoc((l) => ({ ...l, city }))}
             onPostalCode={(postal) => setLoc((l) => (l.postal ? l : { ...l, postal }))}
-            placeholder={placeholder}
-            className={inputClass}
           />
-        </Field>
-        <Field label="Postal Code">
-          <input className={inputClass} value={loc.postal} placeholder="Optional" onChange={(e) => setLoc((l) => ({ ...l, postal: e.target.value }))} />
-        </Field>
+        </div>
+        <div className="form-field">
+          <div className="label">Postal Code</div>
+          <input className="field w-input" type="text" placeholder="Optional" value={loc.postal} onChange={(e) => setLoc((l) => ({ ...l, postal: e.target.value }))} />
+        </div>
       </div>
+      <label className="shipnow-checkbox-row">
+        <input type="checkbox" />
+        <span>This is a residential address</span>
+      </label>
     </div>
   );
 }
@@ -43,26 +57,29 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
   const [dest, setDest] = useState<Loc>({ country: prefill.dest_country ?? "", city: prefill.dest_city ?? "", postal: prefill.dest_postal ?? "" });
   const [pkg, setPkg] = useState({
     weight: prefill.weight ?? "5",
-    quantity: prefill.quantity ?? "1",
+    quantity: Math.max(1, parseInt(prefill.quantity ?? "1") || 1),
     length: prefill.length ?? "",
     width: prefill.width ?? "",
     height: prefill.height ?? "",
   });
-  const [showPackage, setShowPackage] = useState(Boolean(prefill.origin_city));
-  const [quotes, setQuotes] = useState<{ dropoff: Quote; pickup: Quote } | null>(null);
+  const [preset, setPreset] = useState<string>();
+  const [showItem, setShowItem] = useState(Boolean(prefill.origin_city));
+  const [locError, setLocError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [quotes, setQuotes] = useState<{ dropoff: Quote; pickup: Quote } | null>(null);
   const [copied, setCopied] = useState(false);
-  const packageRef = useRef<HTMLDivElement>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const locationsReady = Boolean(origin.city.trim() && origin.country && dest.city.trim() && dest.country);
-  const totalWeight = (parseFloat(pkg.weight) || 0) * (parseInt(pkg.quantity) || 1);
 
   const getQuote = useCallback(async () => {
     setError("");
-    if (!locationsReady || totalWeight <= 0) {
+    const weight = parseFloat(pkg.weight);
+    if (!locationsReady || !(weight > 0)) {
       setError("Please fill in the origin, destination, and a parcel weight greater than 0.");
+      setQuotes(null);
       return;
     }
     setLoading(true);
@@ -72,7 +89,7 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pricingMethod: "location",
-          weightKg: totalWeight,
+          weightKg: weight,
           originCity: origin.city.trim(),
           originCountry: origin.country,
           destinationCity: dest.city.trim(),
@@ -94,7 +111,7 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
     } finally {
       setLoading(false);
     }
-  }, [locationsReady, totalWeight, origin, dest]);
+  }, [locationsReady, pkg.weight, origin, dest]);
 
   // Opening a shared quote link reproduces the same quote automatically.
   const autoRan = useRef(false);
@@ -106,142 +123,137 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
   }, [prefill.origin_city, prefill.dest_city, getQuote]);
 
   function shipUrl(fulfillment: string) {
-    const p = new URLSearchParams({
-      fulfillment,
-      pickup_city: origin.city.trim(),
-      pickup_country: origin.country,
-      pickup_postal: origin.postal,
-      delivery_city: dest.city.trim(),
-      delivery_country: dest.country,
-      delivery_postal: dest.postal,
-      weight: pkg.weight,
-      pieces: pkg.quantity,
-      length: pkg.length,
-      width: pkg.width,
-      height: pkg.height,
-    });
-    return `/ship?${p}`;
+    return (
+      "/ship?" +
+      new URLSearchParams({
+        pricing_method: "location",
+        package_weight: pkg.weight,
+        package_pieces: String(pkg.quantity),
+        package_length: pkg.length,
+        package_width: pkg.width,
+        package_height: pkg.height,
+        pickup_city: origin.city.trim(),
+        pickup_country: origin.country,
+        pickup_postal_code: origin.postal.trim(),
+        delivery_city: dest.city.trim(),
+        delivery_country: dest.country,
+        delivery_postal_code: dest.postal.trim(),
+        fulfillment,
+      })
+    );
   }
 
   function shareUrl() {
     const p = new URLSearchParams({
-      origin_country: origin.country,
-      origin_city: origin.city,
-      origin_postal: origin.postal,
-      dest_country: dest.country,
-      dest_city: dest.city,
-      dest_postal: dest.postal,
       weight: pkg.weight,
-      quantity: pkg.quantity,
+      quantity: String(pkg.quantity),
       length: pkg.length,
       width: pkg.width,
       height: pkg.height,
+      origin_city: origin.city.trim(),
+      origin_country: origin.country,
+      origin_postal: origin.postal.trim(),
+      dest_city: dest.city.trim(),
+      dest_country: dest.country,
+      dest_postal: dest.postal.trim(),
     });
     return `${window.location.origin}/ship-now?${p}`;
   }
 
   const eta = origin.country === dest.country ? "Estimated delivery in 2–3 days" : "Estimated delivery in 5–10 days";
+  const price = (q: Quote) => q.currencySymbol + q.displayAmount.toLocaleString("en-US");
 
   return (
-    <div className="space-y-6">
-      <section className={cardClass}>
-        <div className="grid gap-8 md:grid-cols-2">
+    <>
+      <div className="shipnow-card">
+        <div className="shipnow-from-to">
           <LocationBlock label="From" loc={origin} setLoc={setOrigin} placeholder="e.g. Lagos" />
           <LocationBlock label="To" loc={dest} setLoc={setDest} placeholder="e.g. London" />
         </div>
-        {!showPackage && (
-          <>
-            <button
-              type="button"
-              className={primaryButton + " mt-8 w-full"}
-              onClick={() => {
-                if (!locationsReady) return setError("Please fill in both the origin and destination before continuing.");
-                setError("");
-                setShowPackage(true);
-                setTimeout(() => packageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-              }}
-            >
-              Describe Your Shipment →
-            </button>
-            {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-          </>
-        )}
-      </section>
+        {locError && <p className="shipnow-error">{locError}</p>}
+        <button
+          type="button"
+          className="shipnow-btn shipnow-btn-solid shipnow-get-quote"
+          onClick={() => {
+            if (!locationsReady) return setLocError("Please fill in both the origin and destination before continuing.");
+            setLocError("");
+            setShowItem(true);
+            setTimeout(() => itemRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+          }}
+        >
+          Describe Your Shipment &rarr;
+        </button>
+      </div>
 
-      {showPackage && (
-        <section ref={packageRef} className={cardClass}>
-          <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted">Shipment</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Weight per piece (kg)">
-              <input type="number" min="0.1" step="0.1" className={inputClass} value={pkg.weight} onChange={(e) => setPkg({ ...pkg, weight: e.target.value })} />
-            </Field>
-            <Field label="Quantity">
-              <input type="number" min="1" step="1" className={inputClass} value={pkg.quantity} onChange={(e) => setPkg({ ...pkg, quantity: e.target.value })} />
-            </Field>
+      <div ref={itemRef} className="shipnow-card shipnow-item-card" style={showItem ? undefined : { display: "none" }}>
+        <p className="shipnow-block-label">Shipment</p>
+        <div className="form-row-3col">
+          <div className="form-field">
+            <div className="label">Weight (kg)</div>
+            <input className="field w-input" type="number" step="0.1" min="0.1" value={pkg.weight} onChange={(e) => setPkg({ ...pkg, weight: e.target.value })} />
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            {(["length", "width", "height"] as const).map((d) => (
-              <Field key={d} label={`${d[0].toUpperCase()}${d.slice(1)} (cm)`}>
-                <input type="number" min="0" step="0.1" className={inputClass} value={pkg[d]} onChange={(e) => setPkg({ ...pkg, [d]: e.target.value })} />
-              </Field>
-            ))}
-          </div>
-          <p className="mb-2 mt-6 text-sm font-semibold text-muted">Not sure about the size?</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {BOX_PRESETS.map((b) => (
-              <button
-                key={b.key}
-                type="button"
-                onClick={() => setPkg({ ...pkg, length: String(b.l), width: String(b.w), height: String(b.h), weight: String(b.weight) })}
-                className="rounded-xl border border-line bg-cream px-3 py-4 text-center text-sm font-bold hover:border-brand"
-              >
-                {b.label}
-                <span className="block text-xs font-normal text-muted">
-                  {b.l}×{b.w}×{b.h} cm
-                </span>
+          <div className="form-field">
+            <div className="label">Quantity</div>
+            <div className="shipnow-qty-stepper">
+              <button type="button" className="shipnow-qty-btn" onClick={() => setPkg({ ...pkg, quantity: Math.max(1, pkg.quantity - 1) })}>
+                &minus;
               </button>
-            ))}
+              <input className="field w-input" type="number" min="1" value={pkg.quantity} readOnly />
+              <button type="button" className="shipnow-qty-btn" onClick={() => setPkg({ ...pkg, quantity: pkg.quantity + 1 })}>
+                +
+              </button>
+            </div>
           </div>
-          <button type="button" onClick={getQuote} disabled={loading} className={primaryButton + " mt-8 w-full"}>
-            {loading ? "Calculating…" : "Get a Quote"}
-          </button>
-          {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-        </section>
-      )}
+          <div className="form-field" />
+        </div>
+        <div className="form-row-3col">
+          {(["length", "width", "height"] as const).map((d) => (
+            <div key={d} className="form-field">
+              <div className="label">{d[0].toUpperCase() + d.slice(1)} (cm)</div>
+              <input className="field w-input" type="number" step="0.1" min="0" placeholder="0" value={pkg[d]} onChange={(e) => setPkg({ ...pkg, [d]: e.target.value })} />
+            </div>
+          ))}
+        </div>
+        <BoxPresets
+          active={preset}
+          onPick={(b) => {
+            setPreset(b.key);
+            setPkg({ ...pkg, length: String(b.l), width: String(b.w), height: String(b.h), weight: String(b.weight) });
+          }}
+        />
+        <button type="button" className="shipnow-btn shipnow-btn-solid shipnow-get-quote" onClick={getQuote} disabled={loading}>
+          {loading ? "Calculating…" : "Get a Quote"}
+        </button>
+        {error && <p className="shipnow-error">{error}</p>}
+      </div>
 
       {quotes && (
-        <section ref={resultsRef} className="space-y-4">
-          <h2 className="text-2xl font-bold">Your Quotes</h2>
+        <div ref={resultsRef} className="shipnow-results">
+          <h2 className="shipnow-results-title">Your Quotes</h2>
           {(
             [
-              ["dropoff", "Drop-off at Coastal Parcel Location", "bg-success", ""],
-              ["pickup", "Schedule a Pickup", "bg-[#1c6fd9]", " · includes pickup fee"],
+              ["dropoff", "Drop-off at Coastal Parcel Location", "shipnow-badge-green", ""],
+              ["pickup", "Schedule a Pickup", "shipnow-badge-blue", " · includes pickup fee"],
             ] as const
-          ).map(([key, title, badge, extra]) => {
-            const q = quotes[key];
-            return (
-              <div key={key} className={cardClass}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className={`rounded-full px-3 py-1 text-sm font-bold text-white ${badge}`}>{title}</span>
-                  <span className="text-2xl font-bold">
-                    {q.currencySymbol}
-                    {q.displayAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted">
-                  {q.route} — {q.distanceKm} km · {eta}
-                  {extra}
-                </p>
-                <Link href={shipUrl(key)} className={primaryButton + " mt-4 w-full"}>
-                  Complete Shipment Details →
-                </Link>
+          ).map(([key, title, badge, extra]) => (
+            <div key={key} className="shipnow-quote-option">
+              <div className="shipnow-quote-option-header">
+                <span className={"shipnow-quote-badge " + badge}>{title}</span>
+                <span className="shipnow-quote-price">{price(quotes[key])}</span>
               </div>
-            );
-          })}
-          <div className="flex flex-wrap gap-3 print:hidden">
+              <p className="shipnow-quote-meta">
+                {quotes[key].route} — {quotes[key].distanceKm} km · {eta}
+                {extra}
+              </p>
+              <Link href={shipUrl(key)} className="shipnow-btn shipnow-btn-solid">
+                Complete Shipment Details &rarr;
+              </Link>
+            </div>
+          ))}
+          <div className="shipnow-quote-actions">
             <button
               type="button"
-              className={outlineButton}
+              className="shipnow-btn shipnow-btn-outline"
               onClick={() =>
                 navigator.clipboard.writeText(shareUrl()).then(() => {
                   setCopied(true);
@@ -253,22 +265,20 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
             </button>
             <button
               type="button"
-              className={outlineButton}
+              className="shipnow-btn shipnow-btn-outline"
               onClick={() => {
                 window.location.href = `mailto:?subject=${encodeURIComponent("My Coastal Parcel Shipping Quote")}&body=${encodeURIComponent("Here is my shipping quote: " + shareUrl())}`;
               }}
             >
               Email Quotes
             </button>
-            <button type="button" className={outlineButton} onClick={() => window.print()}>
+            <button type="button" className="shipnow-btn shipnow-btn-outline" onClick={() => window.print()}>
               Print Quotes
             </button>
           </div>
-          <p className="text-xs text-muted">
-            Prices are estimates based on the details provided and today&apos;s exchange rates. The final amount is confirmed at checkout.
-          </p>
-        </section>
+          <p className="shipnow-quote-disclaimer">Prices are estimates based on the details provided and today&apos;s exchange rates. The final amount is confirmed at checkout.</p>
+        </div>
       )}
-    </div>
+    </>
   );
 }
