@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { contactMessages, settings, shipments, trackingEvents, users } from "@/db/schema";
 import { SHIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
-import { notifyCustomerStatusChange, notifyDriverAssigned } from "@/lib/email";
+import { notifyCustomerStatusChange, notifyDriverAssigned, sendDriverDecision, sendStaffAccountCreated } from "@/lib/email";
 import { DEFAULT_PRICING } from "@/lib/pricing";
 import { addTrackingEvent, getShipment } from "@/lib/shipments";
 
@@ -62,10 +62,15 @@ export async function boSetDriverStatus(formData: FormData) {
   await requireStaff();
   const status = String(formData.get("driver_status") ?? "");
   if (status === "approved" || status === "rejected" || status === "pending") {
-    await db
-      .update(users)
-      .set({ driverStatus: status })
-      .where(and(eq(users.id, Number(formData.get("driver_id"))), eq(users.role, "driver")));
+    const [driver] = await db
+      .select({ id: users.id, email: users.email, name: users.name, driverStatus: users.driverStatus })
+      .from(users)
+      .where(and(eq(users.id, Number(formData.get("driver_id"))), eq(users.role, "driver")))
+      .limit(1);
+    if (driver && driver.driverStatus !== status) {
+      await db.update(users).set({ driverStatus: status }).where(eq(users.id, driver.id));
+      await sendDriverDecision(driver, status);
+    }
   }
   redirect("/backoffice?panel=drivers&saved=1");
 }
@@ -120,6 +125,7 @@ export async function boCreateStaff(formData: FormData) {
   if (taken) redirect("/backoffice?panel=staff&error=exists");
 
   await db.insert(users).values({ name: full_name.slice(0, 191), email, passwordHash: await bcrypt.hash(password, 10), role: "staff" });
+  await sendStaffAccountCreated({ email, name: full_name });
   redirect("/backoffice?panel=staff&saved=1");
 }
 

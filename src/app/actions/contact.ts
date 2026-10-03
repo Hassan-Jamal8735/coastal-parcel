@@ -3,7 +3,7 @@
 import * as z from "zod";
 import { db } from "@/db";
 import { contactMessages } from "@/db/schema";
-import { sendEmail } from "@/lib/email";
+import { notifyContactMessage } from "@/lib/email";
 
 export type ContactState = { error?: string; success?: string; values?: Record<string, string> } | undefined;
 
@@ -22,11 +22,7 @@ export async function submitContact(_prev: ContactState, formData: FormData): Pr
   if (!z.email().safeParse(email).success) return { error: "Please enter a valid email address.", values };
 
   await db.insert(contactMessages).values({ name, email, phone: phone || null, subject: subject || null, message });
-  await sendEmail(
-    process.env.ADMIN_EMAIL ?? "Info@coastalparcel.com",
-    `New contact message: ${subject || "No subject"}`,
-    `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\n\nMessage:\n${message}`,
-  );
+  await notifyContactMessage({ name, email, phone, subject, message });
 
   return { success: "Thank you! Your message has been received — we'll get back to you soon." };
 }

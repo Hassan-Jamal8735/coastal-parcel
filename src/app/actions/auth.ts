@@ -7,6 +7,7 @@ import * as z from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { homeFor } from "@/lib/dal";
+import { sendDriverApplicationReceived, sendWelcomeCustomer } from "@/lib/email";
 import { createSession, deleteSession } from "@/lib/session";
 
 export type AuthFormState = { error?: string; values?: Record<string, string> } | undefined;
@@ -80,6 +81,7 @@ export async function signupCustomer(_: AuthFormState, formData: FormData): Prom
     })
     .returning({ id: users.id });
 
+  await sendWelcomeCustomer({ email: parsed.data.email, name: parsed.data.full_name });
   await createSession(user.id, "customer");
   redirect(safeRedirect(formData.get("redirect_to")) ?? "/dashboard");
 }
@@ -104,6 +106,7 @@ export async function signupDriver(_: AuthFormState, formData: FormData): Promis
     })
     .returning({ id: users.id });
 
+  await sendDriverApplicationReceived({ email: parsed.data.email, name: parsed.data.full_name });
   await createSession(user.id, "driver");
   redirect("/driver-dashboard");
 }

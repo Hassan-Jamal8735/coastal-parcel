@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
+import { sendWelcomeCustomer } from "@/lib/email";
 import { shipments, users } from "@/db/schema";
 import { createSession } from "@/lib/session";
 import { canAccessShipment, clearGuestCookie, getShipment } from "@/lib/shipments";
@@ -44,6 +45,7 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
       .values({ name, email, phone: s.senderPhone, passwordHash: await bcrypt.hash(password, 10), role: "customer" })
       .returning({ id: users.id });
     userId = created.id;
+    await sendWelcomeCustomer({ email, name });
   }
 
   await db.update(shipments).set({ customerId: userId, guestToken: null, updatedAt: new Date() }).where(eq(shipments.id, id));
