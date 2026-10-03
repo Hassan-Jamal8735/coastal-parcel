@@ -16,7 +16,9 @@ export async function proxy(request: NextRequest) {
 
   const session = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
-    const url = new URL("/user-account-creation", request.url);
+    // Drivers log in from their own sign-up page, as in WordPress.
+    const login = area.prefix === "/driver-dashboard" ? "/delivery-man-account-set-up" : "/user-account-creation";
+    const url = new URL(login, request.url);
     url.searchParams.set("tab", "login");
     url.searchParams.set("redirect_to", pathname + search);
     return NextResponse.redirect(url);

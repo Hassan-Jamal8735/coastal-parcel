@@ -14,6 +14,11 @@ export const FLASH: Record<string, { form: string; panel: string; type: "error" 
   note_denied: { form: "note", panel: "shipments", type: "error", text: "You do not have access to this shipment." },
   note_empty: { form: "note", panel: "shipments", type: "error", text: "Please write a note before submitting." },
   note_saved: { form: "note", panel: "shipments", type: "success", text: "Your note has been added." },
+  driver_not_found: { form: "driver_shipments", panel: "shipments", type: "error", text: "Shipment not found." },
+  driver_cannot_advance: { form: "driver_shipments", panel: "shipments", type: "error", text: "This shipment cannot be advanced further." },
+  driver_photo_required: { form: "driver_shipments", panel: "shipments", type: "error", text: "Please attach a photo of the delivered parcel before marking this shipment as delivered." },
+  driver_upload_failed: { form: "driver_shipments", panel: "shipments", type: "error", text: "Could not upload the delivery photo. Please use a JPG, PNG, WebP or GIF under 2 MB and try again." },
+  driver_upload_unconfigured: { form: "driver_shipments", panel: "shipments", type: "error", text: "Photo uploads aren't set up yet (missing Vercel Blob token). Please contact the office." },
 };
 
 export function flashFor(msg: string | undefined) {
