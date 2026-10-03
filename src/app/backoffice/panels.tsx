@@ -449,8 +449,7 @@ export async function PricingPanel({ saved }: { saved: boolean }) {
         )}
         <p className="dashboard-panel-subtext" style={{ marginBottom: 0 }}>
           For security, gateway keys are stored as environment variables in Vercel (Project &rarr; Settings &rarr; Environment Variables), not in the
-          database: <code>PAYSTACK_SECRET_KEY</code>, <code>NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY</code>, <code>STRIPE_SECRET_KEY</code> and{" "}
-          <code>NEXT_PUBLIC_STRIPE_PUBLIC_KEY</code>. Redeploy after changing them.
+          database: <code>PAYSTACK_SECRET_KEY</code> and <code>STRIPE_SECRET_KEY</code>. Redeploy after changing them.
         </p>
       </div>
     </>
