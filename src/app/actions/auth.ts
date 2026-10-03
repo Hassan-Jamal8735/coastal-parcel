@@ -9,7 +9,17 @@ import { users } from "@/db/schema";
 import { homeFor } from "@/lib/dal";
 import { createSession, deleteSession } from "@/lib/session";
 
-export type AuthFormState = { error?: string } | undefined;
+export type AuthFormState = { error?: string; values?: Record<string, string> } | undefined;
+
+/** The non-secret fields, echoed back on error so the form can be refilled (React resets forms after an action). */
+function keep(formData: FormData) {
+  const values: Record<string, string> = {};
+  for (const k of ["full_name", "email", "phone", "vehicle_type"]) {
+    const v = formData.get(k);
+    if (typeof v === "string") values[k] = v.slice(0, 256);
+  }
+  return values;
+}
 
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address.").trim().toLowerCase(),
@@ -40,12 +50,12 @@ async function emailTaken(email: string) {
 
 export async function login(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values: keep(formData) };
 
   const [user] = await db.select().from(users).where(eq(users.email, parsed.data.email)).limit(1);
   // Same message for unknown email and wrong password, so the form can't be used to discover accounts.
   if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
-    return { error: "Incorrect email or password." };
+    return { error: "Incorrect email or password.", values: keep(formData) };
   }
 
   await createSession(user.id, user.role);
@@ -56,8 +66,8 @@ export async function login(_: AuthFormState, formData: FormData): Promise<AuthF
 
 export async function signupCustomer(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists." };
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values: keep(formData) };
+  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists.", values: keep(formData) };
 
   const [user] = await db
     .insert(users)
@@ -76,8 +86,8 @@ export async function signupCustomer(_: AuthFormState, formData: FormData): Prom
 
 export async function signupDriver(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = driverSignupSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists." };
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values: keep(formData) };
+  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists.", values: keep(formData) };
 
   // New drivers start "pending" — staff approve them in the backoffice
   // before they can be assigned shipments.

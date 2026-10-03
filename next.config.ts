@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "4mb",
     },
   },
+  async redirects() {
+    // Old WordPress URL — the quote calculator lives at /ship-now.
+    return [{ source: "/get-a-quote", destination: "/ship-now", permanent: true }];
+  },
 };
 
 export default nextConfig;

@@ -35,6 +35,8 @@ export function AuthTabs({
   const [signupState, signup, signingUp] = useActionState(signupAction, undefined);
   const [loginState, login, loggingIn] = useActionState(loginAction, undefined);
   const driver = variant === "driver";
+  const sv = signupState?.values ?? {};
+  const lv = loginState?.values ?? {};
 
   return (
     <section className="section_big">
@@ -62,27 +64,27 @@ export function AuthTabs({
           <div className="w-tab-content">
             <div className={"w-tab-pane" + (tab === "signup" ? " w--tab-active" : "")}>
               <div className="form-block-2 w-form">
-                <form action={signup} className="form-2">
+                <form key={JSON.stringify(signupState ?? {})} action={signup} className="form-2">
                   <h1 className="mb-20">Create your account</h1>
                   <p className="p-light">{driver ? "Apply to become a Coastal Parcel delivery driver." : "Create a free account to book and track shipments."}</p>
                   <ErrorBox state={signupState} />
                   {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
                   <div className="form-field">
                     <div className="label">Full Name</div>
-                    <input className="field w-input" maxLength={256} name="full_name" placeholder="Your full name" type="text" required />
+                    <input className="field w-input" maxLength={256} name="full_name" defaultValue={sv.full_name} placeholder="Your full name" type="text" required />
                   </div>
                   <div className="form-field">
                     <div className="label">Email</div>
-                    <input className="field w-input" maxLength={256} name="email" placeholder="johndoe@gmail.com" type="email" required />
+                    <input className="field w-input" maxLength={256} name="email" defaultValue={sv.email} placeholder="johndoe@gmail.com" type="email" required />
                   </div>
                   <div className="form-field">
                     <div className="label">{driver ? "Telephone Number" : "Phone Number"}</div>
-                    <input className="field w-input" maxLength={256} name="phone" placeholder="0800 000 0000" type="tel" required />
+                    <input className="field w-input" maxLength={256} name="phone" defaultValue={sv.phone} placeholder="0800 000 0000" type="tel" required />
                   </div>
                   {driver && (
                     <div className="form-field">
                       <div className="label">Vehicle Type</div>
-                      <select className="field w-select" name="vehicle_type" required defaultValue="">
+                      <select className="field w-select" name="vehicle_type" required defaultValue={sv.vehicle_type ?? ""}>
                         <option value="" disabled>Select vehicle type</option>
                         <option value="motorcycle">Motorcycle</option>
                         <option value="car">Car</option>
@@ -103,7 +105,7 @@ export function AuthTabs({
 
             <div className={"w-tab-pane" + (tab === "login" ? " w--tab-active" : "")}>
               <div className="form-block-2 w-form">
-                <form action={login} className="form-2">
+                <form key={JSON.stringify(loginState ?? {})} action={login} className="form-2">
                   <h1 className="mb-20">Log in</h1>
                   <p className="p-light">{driver ? "Enter your credentials to log in to your driver account." : "Enter your credentials to log in to our platform."}</p>
                   {notice}
@@ -111,7 +113,7 @@ export function AuthTabs({
                   {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
                   <div className="form-field">
                     <div className="label">Email</div>
-                    <input className="field w-input" maxLength={256} name="email" placeholder="johndoe@gmail.com" type="email" required />
+                    <input className="field w-input" maxLength={256} name="email" defaultValue={lv.email} placeholder="johndoe@gmail.com" type="email" required />
                   </div>
                   <div className="form-field">
                     <div className="label">Password</div>
