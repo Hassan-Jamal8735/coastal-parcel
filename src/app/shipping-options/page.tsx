@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { selectService } from "@/app/actions/booking-steps";
 import { BookingLayout, ShipnowStepper } from "@/components/booking-layout";
-import { SERVICE_TYPES } from "@/lib/constants";
+import { SERVICE_TYPES, SITE_TIMEZONE } from "@/lib/constants";
 import { calculateFinalPrice, deliveryEstimate, getPricingSettings } from "@/lib/pricing";
 import { requireAccessibleShipment } from "@/lib/shipments";
 
@@ -14,7 +14,7 @@ export default async function ShippingOptionsPage({ searchParams }: { searchPara
   if (s.status !== "draft") redirect(`/booking?shipment_id=${s.id}`);
   const rates = await getPricingSettings();
   const isDomestic = s.pickupCountry === s.deliveryCountry;
-  const now = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const now = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: SITE_TIMEZONE });
 
   return (
     <BookingLayout active="ship">

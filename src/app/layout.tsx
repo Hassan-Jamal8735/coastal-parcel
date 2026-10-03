@@ -18,6 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="stylesheet" href="/assets/css/webflow.css" />
         <link rel="stylesheet" href="/assets/css/overrides.css" />
         <link rel="stylesheet" href="/assets/leaflet/leaflet.css" />
+        <link rel="stylesheet" href="/assets/css/quote-widget.css" />
         <link rel="stylesheet" href="/assets/css/next.css" />
       </head>
       <body className="body">{children}</body>
