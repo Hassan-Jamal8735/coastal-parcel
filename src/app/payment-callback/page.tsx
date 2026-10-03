@@ -23,16 +23,16 @@ export default async function PaymentCallbackPage({
   let error = "Missing payment reference.";
   const user = await getCurrentUser();
   if (q.gateway === "stripe" && q.session_id && stripeReady()) {
-    const result = await verifyStripe(q.session_id);
+    const result = await verifyStripe(q.session_id, s.id);
     if (result.ok) {
-      await finalizePaidShipment(s.id, "stripe", q.session_id, `Payment received via Stripe. Session: ${q.session_id}`, user?.id);
+      await finalizePaidShipment(s.id, "stripe", q.session_id, `Payment received via Stripe. Session: ${q.session_id}`, user?.id, result);
       redirect(`/booking-confirmed?shipment_id=${s.id}`);
     }
     error = result.error;
   } else if (q.reference && paystackReady()) {
-    const result = await verifyPaystack(q.reference);
+    const result = await verifyPaystack(q.reference, s.id);
     if (result.ok) {
-      await finalizePaidShipment(s.id, "paystack", q.reference, `Payment received via Paystack. Reference: ${q.reference}`, user?.id);
+      await finalizePaidShipment(s.id, "paystack", q.reference, `Payment received via Paystack. Reference: ${q.reference}`, user?.id, result);
       redirect(`/booking-confirmed?shipment_id=${s.id}`);
     }
     error = result.error;

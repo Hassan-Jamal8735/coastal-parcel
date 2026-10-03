@@ -36,3 +36,13 @@
   letter-spacing: 8px;
   text-align: center;
 }
+
+/* Pay page: the amount a gateway really bills when it differs from the total shown. */
+.pay-gateway-charge {
+  display: block;
+  font-weight: 600;
+  color: #a17a00;
+}
+.pay-gateway-powered .pay-gateway-charge {
+  display: inline;
+}

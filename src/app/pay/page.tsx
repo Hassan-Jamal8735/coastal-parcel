@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { processPayment } from "@/app/actions/payment";
 import { BookingLayout } from "@/components/booking-layout";
-import { currencySymbol, serviceLabel } from "@/lib/constants";
-import { paystackReady, stripeReady } from "@/lib/payments";
+import { currencySymbol, formatMoney, serviceLabel } from "@/lib/constants";
+import { paystackCharge, paystackReady, stripeCharge, stripeReady } from "@/lib/payments";
 import { calculateFinalPrice, convertNgnTo, getPricingSettings } from "@/lib/pricing";
 import { requireAccessibleShipment } from "@/lib/shipments";
 import { PayForm } from "./pay-form";
@@ -23,6 +23,10 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
   const paystack = paystackReady();
   const stripe = stripeReady();
   const live = paystack || stripe;
+  // Shown under a gateway only when it charges a different currency than the total above.
+  const chargeNote = (c: { currency: string; amount: number }) => (c.currency === currency ? null : `Charged as ${formatMoney(Math.round(c.amount * 100) / 100, c.currency)}`);
+  const paystackNote = paystack ? chargeNote(paystackCharge(s)) : null;
+  const stripeNote = stripe ? chargeNote(await stripeCharge(s)) : null;
 
   const rows: [string, string][] = [["Transportation Charges", await show(b.basePrice)]];
   if (Math.abs(b.serviceAdjustment) > 0.01) {
@@ -85,7 +89,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
         </>
       )}
 
-      <PayForm action={processPayment.bind(null, s.id)} paystack={paystack} stripe={stripe} />
+      <PayForm action={processPayment.bind(null, s.id)} paystack={paystack} stripe={stripe} paystackNote={paystackNote} stripeNote={stripeNote} />
     </BookingLayout>
   );
 }

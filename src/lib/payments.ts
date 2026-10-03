@@ -26,10 +26,33 @@ async function contactEmail(s: Shipment) {
   return s.senderEmail ?? "";
 }
 
+/**
+ * Currencies the Paystack account accepts. Nigerian accounts take only NGN
+ * unless others are enabled by Paystack; list extras in PAYSTACK_CURRENCIES
+ * (e.g. "NGN,USD") once they are.
+ */
+const paystackCurrencies = () => (process.env.PAYSTACK_CURRENCIES ?? "NGN").toUpperCase().split(",").map((c) => c.trim());
+
+/**
+ * What Paystack will charge: the customer's chosen currency when the account
+ * supports it, otherwise naira (the booking's base price).
+ */
+export function paystackCharge(s: Shipment) {
+  const chosen = (s.chargeCurrency || s.currency).toUpperCase();
+  if (paystackCurrencies().includes(chosen) && s.chargeAmount != null) return { currency: chosen, amount: s.chargeAmount };
+  return { currency: "NGN", amount: s.priceAmount };
+}
+
+/** What Stripe will charge: the chosen currency, or US dollars for a naira booking (Stripe doesn't take NGN). */
+export async function stripeCharge(s: Shipment) {
+  const chosen = (s.chargeCurrency ?? "").toUpperCase();
+  if (chosen && chosen !== "NGN" && s.chargeAmount != null) return { currency: chosen, amount: s.chargeAmount };
+  return { currency: "USD", amount: await convertNgnTo(s.priceAmount, "USD") };
+}
+
 /** Initializes a Paystack transaction and returns its hosted-checkout URL. */
 export async function startPaystackCheckout(s: Shipment) {
-  const currency = s.chargeCurrency || s.currency;
-  const amount = s.chargeAmount ?? s.priceAmount;
+  const { currency, amount } = paystackCharge(s);
   const res = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
@@ -53,12 +76,9 @@ export async function startPaystackCheckout(s: Shipment) {
  * accounts, so an NGN booking is charged in USD at today's rate.
  */
 export async function startStripeCheckout(s: Shipment) {
-  let currency = (s.chargeCurrency ?? "").toLowerCase();
-  let amount = s.chargeAmount ?? s.priceAmount;
-  if (!currency || currency === "ngn") {
-    currency = "usd";
-    amount = await convertNgnTo(s.priceAmount, "USD");
-  }
+  const charge = await stripeCharge(s);
+  const currency = charge.currency.toLowerCase();
+  const amount = charge.amount;
   const params = new URLSearchParams({
     mode: "payment",
     "payment_method_types[]": "card",
@@ -82,25 +102,36 @@ export async function startStripeCheckout(s: Shipment) {
   return data.url as string;
 }
 
-/** Server-side verification — payment success is never trusted from the redirect alone. */
-export async function verifyPaystack(reference: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export type Verified = { ok: true; currency: string; amount: number } | { ok: false; error: string };
+
+/**
+ * Server-side verification — payment success is never trusted from the
+ * redirect alone. The transaction must also belong to this shipment, so a
+ * reference from another (cheaper) payment can't be replayed here.
+ */
+export async function verifyPaystack(reference: string, shipmentId: number): Promise<Verified> {
   const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
     headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
     cache: "no-store",
   }).catch(() => null);
   if (!res) return { ok: false, error: "Could not reach Paystack to verify the payment." };
   const body = await res.json();
-  return body?.data?.status === "success" ? { ok: true } : { ok: false, error: body?.message ?? "Payment could not be verified." };
+  const d = body?.data;
+  if (d?.status !== "success") return { ok: false, error: body?.message ?? "Payment could not be verified." };
+  if (Number(d.metadata?.shipment_id) !== shipmentId) return { ok: false, error: "This payment doesn't belong to this shipment." };
+  return { ok: true, currency: String(d.currency).toUpperCase(), amount: Number(d.amount) / 100 };
 }
 
-export async function verifyStripe(sessionId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function verifyStripe(sessionId: string, shipmentId: number): Promise<Verified> {
   const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
     headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
     cache: "no-store",
   }).catch(() => null);
   if (!res) return { ok: false, error: "Could not reach Stripe to verify the payment." };
   const data = await res.json();
-  return data?.payment_status === "paid" ? { ok: true } : { ok: false, error: data?.error?.message ?? "Payment could not be verified." };
+  if (data?.payment_status !== "paid") return { ok: false, error: data?.error?.message ?? "Payment could not be verified." };
+  if (Number(data.metadata?.shipment_id) !== shipmentId) return { ok: false, error: "This payment doesn't belong to this shipment." };
+  return { ok: true, currency: String(data.currency).toUpperCase(), amount: Number(data.amount_total) / 100 };
 }
 
 /**
@@ -108,11 +139,27 @@ export async function verifyStripe(sessionId: string): Promise<{ ok: true } | { 
  * shipment still awaiting payment, so a double callback (refresh, back
  * button) can't create a second tracking number or a duplicate event.
  */
-export async function finalizePaidShipment(shipmentId: number, gateway: string, reference: string, note: string, actorId?: number | null) {
+export async function finalizePaidShipment(
+  shipmentId: number,
+  gateway: string,
+  reference: string,
+  note: string,
+  actorId?: number | null,
+  charged?: { currency: string; amount: number },
+) {
   const trackingNumber = await generateTrackingNumber();
   const updated = await db
     .update(shipments)
-    .set({ status: "paid", paymentStatus: "paid", paymentGateway: gateway, paymentReference: reference, trackingNumber, updatedAt: new Date() })
+    .set({
+      status: "paid",
+      paymentStatus: "paid",
+      paymentGateway: gateway,
+      paymentReference: reference,
+      trackingNumber,
+      // Record what the gateway actually charged (e.g. Paystack in NGN for a USD quote).
+      ...(charged ? { chargeCurrency: charged.currency, chargeAmount: charged.amount } : {}),
+      updatedAt: new Date(),
+    })
     .where(and(eq(shipments.id, shipmentId), eq(shipments.status, "confirmed")))
     .returning({ id: shipments.id });
   if (!updated.length) return;

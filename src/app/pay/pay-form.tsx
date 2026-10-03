@@ -14,10 +14,15 @@ export function PayForm({
   action,
   paystack,
   stripe,
+  paystackNote,
+  stripeNote,
 }: {
   action: (state: PayState, formData: FormData) => Promise<PayState>;
   paystack: boolean;
   stripe: boolean;
+  /** e.g. "Charged as ₦4,637,715" when the gateway bills a different currency than the total shown. */
+  paystackNote?: string | null;
+  stripeNote?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const [accepted, setAccepted] = useState(false);
@@ -39,6 +44,7 @@ export function PayForm({
                 Paystack
               </span>
               <span className="pay-gateway-desc">Cards, bank transfer &amp; USSD &mdash; NGN</span>
+              {paystackNote && <span className="pay-gateway-desc pay-gateway-charge">{paystackNote}</span>}
             </span>
           </label>
           <label className="gateway-choice-option">
@@ -50,6 +56,7 @@ export function PayForm({
                 Stripe
               </span>
               <span className="pay-gateway-desc">Cards &mdash; USD</span>
+              {stripeNote && <span className="pay-gateway-desc pay-gateway-charge">{stripeNote}</span>}
             </span>
           </label>
         </div>
@@ -61,6 +68,7 @@ export function PayForm({
             <img src={paystack ? "/assets/img/brands/paystack-mark.svg" : "/assets/img/brands/stripe.svg"} alt="" className="pay-gateway-logo" />
             {paystack ? "Paystack" : "Stripe"}
           </span>
+          {(paystack ? paystackNote : stripeNote) && <span className="pay-gateway-charge"> &middot; {paystack ? paystackNote : stripeNote}</span>}
         </p>
       ) : null}
 
