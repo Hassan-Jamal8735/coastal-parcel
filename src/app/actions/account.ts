@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getCurrentUser, homeFor } from "@/lib/dal";
 import { addTrackingEvent, getShipment } from "@/lib/shipments";
+import { issueVerificationCode } from "@/lib/verification";
 
 /** Profile + password updates shared by the customer and driver dashboards (WordPress inc/dashboard.php). */
 
@@ -30,6 +31,8 @@ export async function updateProfile(formData: FormData) {
   if (taken) back(home, "profile", "profile_email_taken");
 
   const vehicle = formData.get("vehicle_type");
+  // A new address has to be proven like the original one was.
+  const emailChanged = emailRaw !== user.email;
   await db
     .update(users)
     .set({
@@ -37,8 +40,13 @@ export async function updateProfile(formData: FormData) {
       email: emailRaw,
       phone: phone.slice(0, 50) || null,
       ...(user.role === "driver" && typeof vehicle === "string" && vehicle ? { vehicleType: vehicle.slice(0, 50) } : {}),
+      ...(emailChanged ? { emailVerifiedAt: null } : {}),
     })
     .where(eq(users.id, user.id));
+  if (emailChanged) {
+    await issueVerificationCode({ id: user.id, email: emailRaw, name });
+    redirect("/verify-email");
+  }
   back(home, "profile", "profile_saved");
 }
 

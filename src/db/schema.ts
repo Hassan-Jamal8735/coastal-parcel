@@ -33,10 +33,24 @@ export const users = pgTable(
     lastLat: numeric("last_lat", { precision: 10, scale: 7, mode: "number" }),
     lastLng: numeric("last_lng", { precision: 10, scale: 7, mode: "number" }),
     lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
+    // Null until the user enters the code emailed to them; unverified
+    // accounts are treated as logged out everywhere except /verify-email.
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
+
+// One active verification code per user (the latest send replaces the previous one).
+export const emailVerifications = pgTable("email_verifications", {
+  userId: bigint("user_id", { mode: "number" })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeHash: varchar("code_hash", { length: 64 }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const shipments = pgTable(
   "shipments",

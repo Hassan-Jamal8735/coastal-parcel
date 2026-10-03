@@ -4,10 +4,10 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { sendWelcomeCustomer } from "@/lib/email";
 import { shipments, users } from "@/db/schema";
 import { createSession } from "@/lib/session";
 import { canAccessShipment, clearGuestCookie, getShipment } from "@/lib/shipments";
+import { issueVerificationCode, issueVerificationCodeIfDue } from "@/lib/verification";
 
 export type ClaimState = { error?: string } | undefined;
 
@@ -29,6 +29,7 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
 
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   let userId: number;
+  let verified = false;
   if (existing) {
     // The email may belong to a driver/staff/admin account — signing that in
     // and handing it a customer shipment would mix up roles and data.
@@ -39,17 +40,22 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
       return { error: "An account with this email already exists — enter its password to claim this shipment, or skip for now." };
     }
     userId = existing.id;
+    verified = Boolean(existing.emailVerifiedAt);
+    if (!verified) await issueVerificationCodeIfDue({ id: userId, email, name: existing.name });
   } else {
     const [created] = await db
       .insert(users)
       .values({ name, email, phone: s.senderPhone, passwordHash: await bcrypt.hash(password, 10), role: "customer" })
       .returning({ id: users.id });
     userId = created.id;
-    await sendWelcomeCustomer({ email, name });
+    await issueVerificationCode({ id: userId, email, name });
   }
 
   await db.update(shipments).set({ customerId: userId, guestToken: null, updatedAt: new Date() }).where(eq(shipments.id, id));
   await clearGuestCookie(id);
   await createSession(userId, "customer");
-  redirect(`/booking-confirmed?shipment_id=${id}`);
+  // A new account proves its email before it's usable; the shipment is
+  // already linked, and verification lands them back on this confirmation.
+  const back = `/booking-confirmed?shipment_id=${id}`;
+  redirect(verified ? back : `/verify-email?redirect_to=${encodeURIComponent(back)}`);
 }

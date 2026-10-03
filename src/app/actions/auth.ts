@@ -6,9 +6,10 @@ import { redirect } from "next/navigation";
 import * as z from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { homeFor } from "@/lib/dal";
+import { getSessionUser, homeFor } from "@/lib/dal";
 import { sendDriverApplicationReceived, sendWelcomeCustomer } from "@/lib/email";
 import { createSession, deleteSession } from "@/lib/session";
+import { checkVerificationCode, issueVerificationCode, issueVerificationCodeIfDue, resendWaitSeconds } from "@/lib/verification";
 
 export type AuthFormState = { error?: string; values?: Record<string, string> } | undefined;
 
@@ -44,9 +45,27 @@ function safeRedirect(value: FormDataEntryValue | null) {
   return next.startsWith("/") && !next.startsWith("//") ? next : null;
 }
 
-async function emailTaken(email: string) {
-  const rows = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  return rows.length > 0;
+type NewAccount = typeof users.$inferInsert;
+
+/**
+ * Creates an unverified account — or, if this email already has an account
+ * that was never verified, takes it over (an unverified account proves
+ * nothing, so it mustn't let anyone squat on an address). Returns null when
+ * the email belongs to a verified account.
+ */
+async function createUnverifiedAccount(values: NewAccount) {
+  const [existing] = await db.select({ id: users.id, verified: users.emailVerifiedAt }).from(users).where(eq(users.email, values.email)).limit(1);
+  if (existing?.verified) return null;
+  if (existing) {
+    await db.update(users).set({ ...values, emailVerifiedAt: null }).where(eq(users.id, existing.id));
+    return existing.id;
+  }
+  const [created] = await db.insert(users).values(values).returning({ id: users.id });
+  return created.id;
+}
+
+function verifyUrl(redirectTo: string | null) {
+  return "/verify-email" + (redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : "");
 }
 
 export async function login(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -62,53 +81,85 @@ export async function login(_: AuthFormState, formData: FormData): Promise<AuthF
   await createSession(user.id, user.role);
   // Staff/drivers always go to their own area; customers may continue where they left off.
   const target = user.role === "customer" ? safeRedirect(formData.get("redirect_to")) : null;
+  if (!user.emailVerifiedAt) {
+    await issueVerificationCodeIfDue(user);
+    redirect(verifyUrl(target));
+  }
   redirect(target ?? homeFor(user.role));
 }
 
 export async function signupCustomer(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values: keep(formData) };
-  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists.", values: keep(formData) };
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      name: parsed.data.full_name,
-      email: parsed.data.email,
-      phone: parsed.data.phone,
-      passwordHash: await bcrypt.hash(parsed.data.password, 10),
-      role: "customer",
-    })
-    .returning({ id: users.id });
+  const values = {
+    name: parsed.data.full_name,
+    email: parsed.data.email,
+    phone: parsed.data.phone,
+    passwordHash: await bcrypt.hash(parsed.data.password, 10),
+    role: "customer" as const,
+    vehicleType: null,
+    driverStatus: null,
+  };
+  const id = await createUnverifiedAccount(values);
+  if (!id) return { error: "An account with this email already exists.", values: keep(formData) };
 
-  await sendWelcomeCustomer({ email: parsed.data.email, name: parsed.data.full_name });
-  await createSession(user.id, "customer");
-  redirect(safeRedirect(formData.get("redirect_to")) ?? "/dashboard");
+  await issueVerificationCode({ id, email: values.email, name: values.name });
+  await createSession(id, "customer");
+  redirect(verifyUrl(safeRedirect(formData.get("redirect_to"))));
 }
 
 export async function signupDriver(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const parsed = driverSignupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values: keep(formData) };
-  if (await emailTaken(parsed.data.email)) return { error: "An account with this email already exists.", values: keep(formData) };
 
   // New drivers start "pending" — staff approve them in the backoffice
   // before they can be assigned shipments.
-  const [user] = await db
-    .insert(users)
-    .values({
-      name: parsed.data.full_name,
-      email: parsed.data.email,
-      phone: parsed.data.phone,
-      vehicleType: parsed.data.vehicle_type,
-      passwordHash: await bcrypt.hash(parsed.data.password, 10),
-      role: "driver",
-      driverStatus: "pending",
-    })
-    .returning({ id: users.id });
+  const values = {
+    name: parsed.data.full_name,
+    email: parsed.data.email,
+    phone: parsed.data.phone,
+    vehicleType: parsed.data.vehicle_type,
+    passwordHash: await bcrypt.hash(parsed.data.password, 10),
+    role: "driver" as const,
+    driverStatus: "pending" as const,
+  };
+  const id = await createUnverifiedAccount(values);
+  if (!id) return { error: "An account with this email already exists.", values: keep(formData) };
 
-  await sendDriverApplicationReceived({ email: parsed.data.email, name: parsed.data.full_name });
-  await createSession(user.id, "driver");
-  redirect("/driver-dashboard");
+  await issueVerificationCode({ id, email: values.email, name: values.name });
+  await createSession(id, "driver");
+  redirect(verifyUrl(null));
+}
+
+/** `at` lets the page show whichever of verify/resend answered last. */
+export type VerifyState = { error?: string; notice?: string; at: number } | undefined;
+
+export async function verifyEmail(_: VerifyState, formData: FormData): Promise<VerifyState> {
+  const user = await getSessionUser();
+  if (!user) redirect("/user-account-creation?tab=login");
+  if (user.emailVerifiedAt) redirect(homeFor(user.role));
+
+  const result = await checkVerificationCode(user.id, String(formData.get("code") ?? ""));
+  if (!result.ok) return { error: result.error, at: Date.now() };
+
+  // The welcome emails wait until the address is proven real.
+  if (user.role === "driver") await sendDriverApplicationReceived(user);
+  else if (user.role === "customer") await sendWelcomeCustomer(user);
+
+  const target = user.role === "customer" ? safeRedirect(formData.get("redirect_to")) : null;
+  redirect(target ?? homeFor(user.role));
+}
+
+export async function resendVerificationCode(): Promise<VerifyState> {
+  const user = await getSessionUser();
+  if (!user) redirect("/user-account-creation?tab=login");
+  if (user.emailVerifiedAt) redirect(homeFor(user.role));
+
+  const wait = await resendWaitSeconds(user.id);
+  if (wait > 0) return { error: `Please wait ${wait} seconds before requesting another code.`, at: Date.now() };
+  await issueVerificationCode(user);
+  return { notice: `A new code has been sent to ${user.email}.`, at: Date.now() };
 }
 
 export async function logout() {

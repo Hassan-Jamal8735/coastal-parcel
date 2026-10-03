@@ -26,6 +26,8 @@ export type EmailContent = {
   intro: string[];
   /** Label/value rows shown in a details box. */
   details?: [string, string][];
+  /** A one-time code, shown large and centred. */
+  code?: string;
   button?: { label: string; url: string };
   /** Extra plain-text paragraphs after the button. */
   outro?: string[];
@@ -48,6 +50,14 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
               )
               .join("")}
           </table>
+        </td></tr>
+      </table>`
+    : "";
+
+  const code = c.code
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;">
+        <tr><td align="center" style="padding:20px 12px;background:#f7f5f0;border:2px dashed ${YELLOW};border-radius:10px;">
+          <span style="font:700 36px/1 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:10px;color:${DARK};">${esc(c.code)}</span>
         </td></tr>
       </table>`
     : "";
@@ -94,6 +104,7 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
       <tr><td class="cp-pad" style="padding:36px 32px 16px;">
         <h1 class="cp-h1" style="margin:0 0 20px;font:700 26px/1.25 ${FONT};color:${DARK};">${esc(c.heading)}</h1>
         ${paragraphs(c.intro)}
+        ${code}
         ${details}
         ${button}
         ${c.outro ? paragraphs(c.outro) : ""}
@@ -118,6 +129,7 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
     c.heading,
     "",
     ...c.intro.flatMap((p) => [p, ""]),
+    ...(c.code ? [c.code, ""] : []),
     ...(c.details ?? []).map(([l, v]) => `${l}: ${v.replace(/\n/g, ", ")}`),
     ...(c.details?.length ? [""] : []),
     ...(c.button ? [`${c.button.label}: ${c.button.url}`, ""] : []),

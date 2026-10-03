@@ -124,7 +124,7 @@ export async function boCreateStaff(formData: FormData) {
   const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (taken) redirect("/backoffice?panel=staff&error=exists");
 
-  await db.insert(users).values({ name: full_name.slice(0, 191), email, passwordHash: await bcrypt.hash(password, 10), role: "staff" });
+  await db.insert(users).values({ name: full_name.slice(0, 191), email, passwordHash: await bcrypt.hash(password, 10), role: "staff", emailVerifiedAt: new Date() });
   await sendStaffAccountCreated({ email, name: full_name });
   redirect("/backoffice?panel=staff&saved=1");
 }

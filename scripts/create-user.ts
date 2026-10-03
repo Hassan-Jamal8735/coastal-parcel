@@ -25,8 +25,8 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 10);
   await db
     .insert(users)
-    .values({ email: email.toLowerCase(), passwordHash, name, role: role as "admin" | "staff" })
-    .onConflictDoUpdate({ target: users.email, set: { passwordHash, role: role as "admin" | "staff", name } });
+    .values({ email: email.toLowerCase(), passwordHash, name, role: role as "admin" | "staff", emailVerifiedAt: new Date() })
+    .onConflictDoUpdate({ target: users.email, set: { passwordHash, role: role as "admin" | "staff", name, emailVerifiedAt: new Date() } });
 
   console.log(`${role} account ready: ${email}`);
   process.exit(0);

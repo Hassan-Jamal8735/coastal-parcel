@@ -178,6 +178,20 @@ export async function notifyDriverAssigned(s: Shipment, driver: { email: string;
 
 /* ---------------- Account emails ---------------- */
 
+export async function sendVerificationCode(user: { email: string; name: string }, code: string) {
+  await sendEmail({
+    to: user.email,
+    subject: `[Coastal Parcel] Your verification code: ${code}`,
+    content: {
+      preheader: `Your code is ${code}. It expires in 15 minutes.`,
+      heading: "Verify your email address",
+      intro: [`Hi ${firstName(user.name)},`, "Enter this code on the Coastal Parcel website to verify your email address:"],
+      code,
+      outro: ["The code expires in 15 minutes. If you didn't create a Coastal Parcel account, you can safely ignore this email."],
+    },
+  });
+}
+
 export async function sendWelcomeCustomer(user: { email: string; name: string }) {
   await sendEmail({
     to: user.email,

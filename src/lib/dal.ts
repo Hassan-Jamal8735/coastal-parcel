@@ -13,8 +13,12 @@ export function homeFor(role: Role) {
   return "/dashboard";
 }
 
-/** The signed-in user (fresh from the database), or null. Cached per request. */
-export const getCurrentUser = cache(async () => {
+/**
+ * The account behind the session cookie (fresh from the database), verified
+ * or not. Only /verify-email should need this — everything else uses
+ * getCurrentUser(). Cached per request.
+ */
+export const getSessionUser = cache(async () => {
   const session = await readSession();
   if (!session) return null;
   const [user] = await db
@@ -26,6 +30,7 @@ export const getCurrentUser = cache(async () => {
       role: users.role,
       vehicleType: users.vehicleType,
       driverStatus: users.driverStatus,
+      emailVerifiedAt: users.emailVerifiedAt,
     })
     .from(users)
     .where(eq(users.id, session.userId))
@@ -34,13 +39,24 @@ export const getCurrentUser = cache(async () => {
 });
 
 /**
+ * The signed-in user, or null. An account that hasn't verified its email yet
+ * counts as signed out, so it can't use anything until the code is entered.
+ */
+export const getCurrentUser = cache(async () => {
+  const user = await getSessionUser();
+  return user?.emailVerifiedAt ? user : null;
+});
+
+/**
  * Authorization check for pages and server actions — the real gate (proxy.ts
  * only does a fast optimistic redirect). Redirects to login when signed out,
- * and to the user's own area when signed in with the wrong role.
+ * to email verification when unverified, and to the user's own area when
+ * signed in with the wrong role.
  */
 export async function requireRole(...allowed: Role[]) {
-  const user = await getCurrentUser();
+  const user = await getSessionUser();
   if (!user) redirect("/user-account-creation?tab=login");
+  if (!user.emailVerifiedAt) redirect("/verify-email");
   if (!allowed.includes(user.role)) redirect(homeFor(user.role));
   return user;
 }

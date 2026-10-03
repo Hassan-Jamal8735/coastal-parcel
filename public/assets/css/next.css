@@ -16,3 +16,23 @@
 .cp-link-button:hover {
   color: #fff;
 }
+
+/* Verify-email page: inline text buttons styled like .auth-role-switch links. */
+.cp-link-button.cp-inline-link {
+  color: #1e1e1e;
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.cp-link-button.cp-inline-link:hover {
+  color: #a17a00;
+}
+.cp-link-button.cp-inline-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.cp-code-input {
+  font-size: 22px;
+  letter-spacing: 8px;
+  text-align: center;
+}
