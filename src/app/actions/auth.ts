@@ -9,7 +9,7 @@ import { users } from "@/db/schema";
 import { getSessionUser, homeFor } from "@/lib/dal";
 import { sendDriverApplicationReceived, sendWelcomeCustomer } from "@/lib/email";
 import { createSession, deleteSession } from "@/lib/session";
-import { checkVerificationCode, issueVerificationCode, issueVerificationCodeIfDue, resendWaitSeconds } from "@/lib/verification";
+import { checkVerificationCode, issueVerificationCode, issueVerificationCodeIfDue, RESEND_COOLDOWN_SECONDS, resendWaitSeconds } from "@/lib/verification";
 
 export type AuthFormState = { error?: string; values?: Record<string, string> } | undefined;
 
@@ -64,8 +64,12 @@ async function createUnverifiedAccount(values: NewAccount) {
   return created.id;
 }
 
-function verifyUrl(redirectTo: string | null) {
-  return "/verify-email" + (redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : "");
+/** The verify page, flagged when the code email couldn't be sent so it can say so. */
+function verifyUrl(redirectTo: string | null, sent = true) {
+  const q = new URLSearchParams();
+  if (redirectTo) q.set("redirect_to", redirectTo);
+  if (!sent) q.set("send_failed", "1");
+  return "/verify-email" + (q.size ? `?${q}` : "");
 }
 
 export async function login(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -82,8 +86,8 @@ export async function login(_: AuthFormState, formData: FormData): Promise<AuthF
   // Staff/drivers always go to their own area; customers may continue where they left off.
   const target = user.role === "customer" ? safeRedirect(formData.get("redirect_to")) : null;
   if (!user.emailVerifiedAt) {
-    await issueVerificationCodeIfDue(user);
-    redirect(verifyUrl(target));
+    const sent = await issueVerificationCodeIfDue(user);
+    redirect(verifyUrl(target, sent));
   }
   redirect(target ?? homeFor(user.role));
 }
@@ -104,9 +108,9 @@ export async function signupCustomer(_: AuthFormState, formData: FormData): Prom
   const id = await createUnverifiedAccount(values);
   if (!id) return { error: "An account with this email already exists.", values: keep(formData) };
 
-  await issueVerificationCode({ id, email: values.email, name: values.name });
+  const sent = await issueVerificationCode({ id, email: values.email, name: values.name });
   await createSession(id, "customer");
-  redirect(verifyUrl(safeRedirect(formData.get("redirect_to"))));
+  redirect(verifyUrl(safeRedirect(formData.get("redirect_to")), sent));
 }
 
 export async function signupDriver(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -127,13 +131,13 @@ export async function signupDriver(_: AuthFormState, formData: FormData): Promis
   const id = await createUnverifiedAccount(values);
   if (!id) return { error: "An account with this email already exists.", values: keep(formData) };
 
-  await issueVerificationCode({ id, email: values.email, name: values.name });
+  const sent = await issueVerificationCode({ id, email: values.email, name: values.name });
   await createSession(id, "driver");
-  redirect(verifyUrl(null));
+  redirect(verifyUrl(null, sent));
 }
 
 /** `at` lets the page show whichever of verify/resend answered last. */
-export type VerifyState = { error?: string; notice?: string; at: number } | undefined;
+export type VerifyState = { error?: string; notice?: string; at: number; cooldown?: number } | undefined;
 
 export async function verifyEmail(_: VerifyState, formData: FormData): Promise<VerifyState> {
   const user = await getSessionUser();
@@ -158,8 +162,10 @@ export async function resendVerificationCode(): Promise<VerifyState> {
 
   const wait = await resendWaitSeconds(user.id);
   if (wait > 0) return { error: `Please wait ${wait} seconds before requesting another code.`, at: Date.now() };
-  await issueVerificationCode(user);
-  return { notice: `A new code has been sent to ${user.email}.`, at: Date.now() };
+  if (!(await issueVerificationCode(user))) {
+    return { error: "We couldn't send the email right now. Please try again in a moment, or contact us if it keeps happening.", at: Date.now() };
+  }
+  return { notice: `A new code has been sent to ${user.email}.`, at: Date.now(), cooldown: RESEND_COOLDOWN_SECONDS };
 }
 
 export async function logout() {

@@ -30,6 +30,7 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   let userId: number;
   let verified = false;
+  let sent = true;
   if (existing) {
     // The email may belong to a driver/staff/admin account — signing that in
     // and handing it a customer shipment would mix up roles and data.
@@ -41,14 +42,14 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
     }
     userId = existing.id;
     verified = Boolean(existing.emailVerifiedAt);
-    if (!verified) await issueVerificationCodeIfDue({ id: userId, email, name: existing.name });
+    if (!verified) sent = await issueVerificationCodeIfDue({ id: userId, email, name: existing.name });
   } else {
     const [created] = await db
       .insert(users)
       .values({ name, email, phone: s.senderPhone, passwordHash: await bcrypt.hash(password, 10), role: "customer" })
       .returning({ id: users.id });
     userId = created.id;
-    await issueVerificationCode({ id: userId, email, name });
+    sent = await issueVerificationCode({ id: userId, email, name });
   }
 
   await db.update(shipments).set({ customerId: userId, guestToken: null, updatedAt: new Date() }).where(eq(shipments.id, id));
@@ -57,5 +58,5 @@ export async function claimGuestShipment(id: number, _: ClaimState, formData: Fo
   // A new account proves its email before it's usable; the shipment is
   // already linked, and verification lands them back on this confirmation.
   const back = `/booking-confirmed?shipment_id=${id}`;
-  redirect(verified ? back : `/verify-email?redirect_to=${encodeURIComponent(back)}`);
+  redirect(verified ? back : `/verify-email?redirect_to=${encodeURIComponent(back)}${sent ? "" : "&send_failed=1"}`);
 }

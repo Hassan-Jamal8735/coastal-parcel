@@ -1,15 +1,16 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { getSessionUser, homeFor } from "@/lib/dal";
+import { resendWaitSeconds } from "@/lib/verification";
 import { VerifyForm } from "./verify-form";
 
 export const metadata = { title: "Verify your email" };
 
-export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<{ redirect_to?: string }> }) {
+export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<{ redirect_to?: string; send_failed?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirect("/user-account-creation?tab=login");
   if (user.emailVerifiedAt) redirect(homeFor(user.role));
-  const { redirect_to } = await searchParams;
+  const { redirect_to, send_failed } = await searchParams;
 
   return (
     <div className="full-wrapper">
@@ -17,7 +18,7 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
       <section className="section_big">
         <div className="img_banner" />
         <div className="modal">
-          <VerifyForm email={user.email} redirectTo={redirect_to} />
+          <VerifyForm email={user.email} redirectTo={redirect_to} sendFailed={send_failed === "1"} initialWait={await resendWaitSeconds(user.id)} />
         </div>
       </section>
     </div>

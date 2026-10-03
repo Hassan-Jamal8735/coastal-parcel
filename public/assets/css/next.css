@@ -46,3 +46,8 @@
 .pay-gateway-powered .pay-gateway-charge {
   display: inline;
 }
+.cp-resend-wait {
+  font-weight: 700;
+  color: #9a9a9a;
+  font-variant-numeric: tabular-nums;
+}

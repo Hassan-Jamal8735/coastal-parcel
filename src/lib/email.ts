@@ -26,7 +26,15 @@ export async function sendEmail(message: Message) {
   }
 }
 
-async function deliver({ to, subject, content, replyTo }: Message) {
+/** Which way email is sent right now — shown in the backoffice so a missing key is obvious. */
+export function emailProvider(): "resend" | "smtp" | null {
+  if (process.env.RESEND_API_KEY) return "resend";
+  if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) return "smtp";
+  return null;
+}
+
+/** Sends now and reports whether it worked — returns false on any failure or when email isn't configured. */
+async function deliver({ to, subject, content, replyTo }: Message): Promise<boolean> {
   const { html, text } = renderEmail(content);
   const key = process.env.RESEND_API_KEY;
   try {
@@ -43,7 +51,11 @@ async function deliver({ to, subject, content, replyTo }: Message) {
           ...(replyTo ? { reply_to: replyTo } : {}),
         }),
       });
-      if (!res.ok) console.error("Email send failed (Resend)", res.status, await res.text());
+      if (!res.ok) {
+        console.error("Email send failed (Resend)", res.status, await res.text());
+        return false;
+      }
+      return true;
     } else if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
       const nodemailer = await import("nodemailer");
       const port = Number(process.env.MAIL_PORT ?? 587);
@@ -55,11 +67,14 @@ async function deliver({ to, subject, content, replyTo }: Message) {
       });
       const from = process.env.MAIL_FROM_ADDRESS ?? process.env.MAIL_USERNAME;
       await transport.sendMail({ from: `Coastal Parcel <${from}>`, to, subject, html, text, replyTo });
+      return true;
     } else {
-      console.info(`[email not configured] to=${to} subject="${subject}"`);
+      console.error(`[email not configured — set RESEND_API_KEY] to=${to} subject="${subject}"`);
+      return false;
     }
   } catch (e) {
     console.error("Email send failed", e);
+    return false;
   }
 }
 
@@ -178,8 +193,9 @@ export async function notifyDriverAssigned(s: Shipment, driver: { email: string;
 
 /* ---------------- Account emails ---------------- */
 
-export async function sendVerificationCode(user: { email: string; name: string }, code: string) {
-  await sendEmail({
+/** Sent immediately (not after the response) so the page can say whether the code really went out. */
+export async function sendVerificationCode(user: { email: string; name: string }, code: string): Promise<boolean> {
+  return deliver({
     to: user.email,
     subject: `[Coastal Parcel] Your verification code: ${code}`,
     content: {

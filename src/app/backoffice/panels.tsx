@@ -7,6 +7,7 @@ import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
 import { SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { emailProvider } from "@/lib/email";
 import { paystackReady, stripeReady } from "@/lib/payments";
 import { getPricingSettings } from "@/lib/pricing";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
@@ -412,6 +413,7 @@ export async function DriversPanel({ saved }: { saved: boolean }) {
 export async function PricingPanel({ saved }: { saved: boolean }) {
   const rates = await getPricingSettings();
   const active = [paystackReady() && "Paystack", stripeReady() && "Stripe"].filter(Boolean) as string[];
+  const email = emailProvider();
 
   return (
     <>
@@ -451,6 +453,20 @@ export async function PricingPanel({ saved }: { saved: boolean }) {
           For security, gateway keys are stored as environment variables in Vercel (Project &rarr; Settings &rarr; Environment Variables), not in the
           database: <code>PAYSTACK_SECRET_KEY</code> and <code>STRIPE_SECRET_KEY</code>. Redeploy after changing them.
         </p>
+      </div>
+
+      <div className="bo-card" id="email">
+        <h3>Email</h3>
+        {email === "resend" ? (
+          <p style={{ color: "#1e7e42", fontWeight: 600 }}>Sending through Resend from {process.env.EMAIL_FROM ?? "Coastal Parcel <noreply@coastalparcel.com>"}.</p>
+        ) : email === "smtp" ? (
+          <p style={{ color: "#a17a00", fontWeight: 600 }}>Sending through SMTP ({process.env.MAIL_HOST}). Add a Resend key for reliable delivery.</p>
+        ) : (
+          <p style={{ color: "#b3401f", fontWeight: 600 }}>
+            Email is not configured — verification codes and notifications are NOT being sent. Add <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> in
+            Vercel, then redeploy.
+          </p>
+        )}
       </div>
     </>
   );

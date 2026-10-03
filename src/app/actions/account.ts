@@ -44,8 +44,8 @@ export async function updateProfile(formData: FormData) {
     })
     .where(eq(users.id, user.id));
   if (emailChanged) {
-    await issueVerificationCode({ id: user.id, email: emailRaw, name });
-    redirect("/verify-email");
+    const sent = await issueVerificationCode({ id: user.id, email: emailRaw, name });
+    redirect(sent ? "/verify-email" : "/verify-email?send_failed=1");
   }
   back(home, "profile", "profile_saved");
 }

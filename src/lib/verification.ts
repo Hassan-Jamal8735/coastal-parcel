@@ -12,7 +12,8 @@ import { sendVerificationCode } from "./email";
  */
 
 const CODE_TTL_MS = 15 * 60 * 1000;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+export const RESEND_COOLDOWN_SECONDS = 60;
+const RESEND_COOLDOWN_MS = RESEND_COOLDOWN_SECONDS * 1000;
 export const MAX_ATTEMPTS = 5;
 
 function hashCode(userId: number, code: string) {
@@ -26,20 +27,32 @@ export async function resendWaitSeconds(userId: number) {
   return Math.max(0, Math.ceil((row.sentAt.getTime() + RESEND_COOLDOWN_MS - Date.now()) / 1000));
 }
 
-/** Creates a fresh code (replacing any previous one) and emails it. */
-export async function issueVerificationCode(user: { id: number; email: string; name: string }) {
+/**
+ * Creates a fresh code (replacing any previous one) and emails it. Returns
+ * whether the email went out; if it didn't, the resend cooldown is lifted so
+ * the user can try again straight away.
+ */
+export async function issueVerificationCode(user: { id: number; email: string; name: string }): Promise<boolean> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const row = { codeHash: hashCode(user.id, code), attempts: 0, expiresAt: new Date(Date.now() + CODE_TTL_MS), sentAt: new Date() };
   await db
     .insert(emailVerifications)
     .values({ userId: user.id, ...row })
     .onConflictDoUpdate({ target: emailVerifications.userId, set: row });
-  await sendVerificationCode(user, code);
+  const sent = await sendVerificationCode(user, code);
+  if (!sent) {
+    await db
+      .update(emailVerifications)
+      .set({ sentAt: new Date(Date.now() - RESEND_COOLDOWN_MS) })
+      .where(eq(emailVerifications.userId, user.id));
+  }
+  return sent;
 }
 
 /** Sends a code unless one was sent within the cooldown (e.g. on repeated logins). */
 export async function issueVerificationCodeIfDue(user: { id: number; email: string; name: string }) {
-  if ((await resendWaitSeconds(user.id)) === 0) await issueVerificationCode(user);
+  if ((await resendWaitSeconds(user.id)) === 0) return issueVerificationCode(user);
+  return true;
 }
 
 export type VerifyResult = { ok: true } | { ok: false; error: string };
