@@ -6,8 +6,10 @@ import { getCurrentUser } from "@/lib/dal";
  * Sidebar for every customer-facing app page (dashboard and the whole
  * booking flow) — WordPress template-parts/customer-sidebar.php.
  * `active`: overview | shipments | ship | profile | settings.
+ * `panels`: on /dashboard itself the entries are data-panel buttons that
+ * switch panels in place (see PanelSwitcher), exactly as in WordPress.
  */
-export async function CustomerSidebar({ active = "" }: { active?: string }) {
+export async function CustomerSidebar({ active = "", panels = false }: { active?: string; panels?: boolean }) {
   const user = await getCurrentUser();
   const cls = (key: string) => "dashboard-nav-link" + (active === key ? " active" : "");
 
@@ -29,11 +31,23 @@ export async function CustomerSidebar({ active = "" }: { active?: string }) {
       <nav className="dashboard-nav">
         {user ? (
           <>
-            <Link href="/dashboard#overview" className={cls("overview")}>Overview</Link>
-            <Link href="/dashboard#shipments" className={cls("shipments")}>My Shipments</Link>
-            <Link href="/ship" className={cls("ship")}>Create Shipment</Link>
-            <Link href="/dashboard#profile" className={cls("profile")}>Profile</Link>
-            <Link href="/dashboard#settings" className={cls("settings")}>Account Settings</Link>
+            {panels ? (
+              <>
+                <button type="button" className={cls("overview")} data-panel="overview">Overview</button>
+                <button type="button" className={cls("shipments")} data-panel="shipments">My Shipments</button>
+                <Link href="/ship" className="dashboard-nav-link">Create Shipment</Link>
+                <button type="button" className={cls("profile")} data-panel="profile">Profile</button>
+                <button type="button" className={cls("settings")} data-panel="settings">Account Settings</button>
+              </>
+            ) : (
+              <>
+                <Link href="/dashboard#overview" className={cls("overview")}>Overview</Link>
+                <Link href="/dashboard#shipments" className={cls("shipments")}>My Shipments</Link>
+                <Link href="/ship" className={cls("ship")}>Create Shipment</Link>
+                <Link href="/dashboard#profile" className={cls("profile")}>Profile</Link>
+                <Link href="/dashboard#settings" className={cls("settings")}>Account Settings</Link>
+              </>
+            )}
           </>
         ) : (
           <Link href="/ship" className={cls("ship")}>Create Shipment</Link>
