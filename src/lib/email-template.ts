@@ -7,6 +7,14 @@
 
 export const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://coastalparcel.com").replace(/\/$/, "");
 
+/**
+ * Where email images load from: the live site's final address (www — the bare
+ * domain redirects, and some mail clients won't follow that for images).
+ * Never localhost, which mail clients can't reach, so emails sent from a local
+ * or preview build still show the logo.
+ */
+const ASSET_BASE = process.env.EMAIL_ASSET_URL ?? "https://www.coastalparcel.com";
+
 const YELLOW = "#F9B416";
 const DARK = "#0d0d0d";
 const TEXT = "#2b2b2b";
@@ -98,7 +106,7 @@ export function renderEmail(c: EmailContent): { html: string; text: string } {
   <tr><td align="center" style="padding:24px 12px;">
     <table role="presentation" class="cp-container" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
       <tr><td class="cp-head" style="background:${DARK};padding:24px 32px;">
-        <a href="${SITE}"><img src="${SITE}/assets/img/email-logo.png" width="200" height="33" alt="Coastal Parcel" style="display:block;border:0;width:200px;height:auto;"></a>
+        <a href="${SITE}"><img src="${ASSET_BASE}/assets/img/email-logo.png" width="200" height="33" alt="Coastal Parcel" style="display:block;border:0;width:200px;height:auto;"></a>
       </td></tr>
       <tr><td style="height:4px;background:${YELLOW};font-size:0;line-height:0;">&nbsp;</td></tr>
       <tr><td class="cp-pad" style="padding:36px 32px 16px;">

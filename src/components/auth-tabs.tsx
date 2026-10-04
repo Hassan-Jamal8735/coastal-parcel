@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import type { AuthFormState } from "@/app/actions/auth";
 import { PasswordInput } from "./password-input";
+import { PhoneInput } from "./phone-input";
 
 type Action = (state: AuthFormState, formData: FormData) => Promise<AuthFormState>;
 
@@ -79,7 +80,7 @@ export function AuthTabs({
                   </div>
                   <div className="form-field">
                     <div className="label">{driver ? "Telephone Number" : "Phone Number"}</div>
-                    <input className="field w-input" maxLength={256} name="phone" defaultValue={sv.phone} placeholder="0800 000 0000" type="tel" required />
+                    <PhoneInput className="field w-input" name="phone" defaultValue={sv.phone} placeholder="0800 000 0000" required />
                   </div>
                   {driver && (
                     <div className="form-field">

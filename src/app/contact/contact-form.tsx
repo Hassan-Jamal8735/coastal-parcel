@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { submitContact } from "@/app/actions/contact";
+import { PhoneInput } from "@/components/phone-input";
 
 export function ContactForm() {
   const [state, action, pending] = useActionState(submitContact, undefined);
@@ -21,7 +22,7 @@ export function ContactForm() {
           <input className="contact-text-field w-input" maxLength={256} name="email" defaultValue={v.email} placeholder="Email*" type="email" id="email" required />
         </div>
         <div className="div-block-41">
-          <input className="contact-text-field w-input" maxLength={256} name="phone" defaultValue={v.phone} placeholder="Phone number*" type="tel" id="phone" required />
+          <PhoneInput className="contact-text-field w-input" name="phone" defaultValue={v.phone} placeholder="Phone number*" id="phone" required />
           <input className="contact-text-field w-input" maxLength={256} name="subject" defaultValue={v.subject} placeholder="Subject*" type="text" id="subject" required />
         </div>
         <textarea placeholder="How we can help..." maxLength={5000} id="message" name="message" defaultValue={v.message} className="contact-text-field text-area w-input" required />

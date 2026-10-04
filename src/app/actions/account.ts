@@ -9,6 +9,7 @@ import { users } from "@/db/schema";
 import { getCurrentUser, homeFor } from "@/lib/dal";
 import { addTrackingEvent, getShipment } from "@/lib/shipments";
 import { issueVerificationCode } from "@/lib/verification";
+import { normalizePhone } from "@/lib/phone";
 
 /** Profile + password updates shared by the customer and driver dashboards (WordPress inc/dashboard.php). */
 
@@ -23,7 +24,9 @@ export async function updateProfile(formData: FormData) {
 
   const name = String(formData.get("full_name") ?? "").trim();
   const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const phone = phoneRaw ? normalizePhone(phoneRaw) : "";
+  if (phone === null) back(home, "profile", "profile_phone_invalid");
   if (!name || !emailRaw) back(home, "profile", "profile_required");
   if (!z.email().safeParse(emailRaw).success) back(home, "profile", "profile_email_invalid");
 
@@ -38,7 +41,7 @@ export async function updateProfile(formData: FormData) {
     .set({
       name: name.slice(0, 191),
       email: emailRaw,
-      phone: phone.slice(0, 50) || null,
+      phone: phone || null,
       ...(user.role === "driver" && typeof vehicle === "string" && vehicle ? { vehicleType: vehicle.slice(0, 50) } : {}),
       ...(emailChanged ? { emailVerifiedAt: null } : {}),
     })

@@ -37,10 +37,10 @@ export async function boSaveShipment(formData: FormData) {
     if (!driver) redirect(`/backoffice?panel=shipments&view=${id}`);
   }
 
-  // A newly-assigned driver can only act from "assigned" onward, so bump a
-  // pre-assignment status — otherwise the shipment sits with no button for them.
+  // A shipment with a driver is at least "assigned" — never let it sit at a
+  // pre-assignment status, where the driver would have no next step.
   const isNewDriver = Boolean(driver) && existing.driverId !== driverId;
-  if (isNewDriver && ["draft", "confirmed", "paid"].includes(status)) status = "assigned";
+  if (driver && ["draft", "confirmed", "paid"].includes(status)) status = "assigned";
 
   await db.update(shipments).set({ status, driverId, updatedAt: new Date() }).where(eq(shipments.id, id));
 

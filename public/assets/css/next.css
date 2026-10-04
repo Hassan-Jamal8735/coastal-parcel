@@ -51,3 +51,355 @@
   color: #9a9a9a;
   font-variant-numeric: tabular-nums;
 }
+
+/* City combobox: chevron so it reads as a dropdown, a "use as typed" row and hints. */
+.cp-city-input {
+  padding-right: 28px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231c1c1c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+.cp-city-manual {
+  font-weight: 600;
+  color: #8a6400;
+  background: #fffaf0;
+}
+.cp-city-hint {
+  padding: 10px 14px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 12.5px;
+  color: #8a8a8a;
+}
+
+/* Side-by-side fields line up on their inputs even when one label wraps. */
+.form-row-2col,
+.form-row-3col {
+  align-items: end;
+}
+
+/* ---- Backoffice shipment detail ---- */
+.sd-back {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+}
+.sd-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.sd-title {
+  margin: 0 0 8px;
+  font-size: 32px;
+  line-height: 1.15;
+}
+.sd-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sd-header-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e1e1e;
+  text-decoration: underline;
+  text-decoration-color: #d8d2c4;
+  text-underline-offset: 3px;
+}
+.sd-header-link:hover {
+  color: #a17a00;
+}
+.sd-muted {
+  color: #7a7a7a;
+  font-size: 13px;
+}
+.sd-strong {
+  font-weight: 700;
+  color: #1c1c1c;
+}
+.bo-card .sd-card-title {
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6400;
+}
+.bo-card .sd-customer {
+  margin: 0 0 14px;
+  font-size: 14.5px;
+}
+.sd-route p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sd-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+.sd-fact {
+  min-width: 0;
+}
+.sd-fact.is-wide {
+  grid-column: 1 / -1;
+}
+.sd-fact dt {
+  font-size: 12px;
+  color: #7a7a7a;
+  margin-bottom: 2px;
+}
+.sd-fact dd {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #1c1c1c;
+  overflow-wrap: anywhere;
+}
+.sd-code {
+  display: block;
+  font-family: 'Inconsolata', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  background: #f7f5f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  word-break: break-all;
+}
+.sd-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sd-timeline li {
+  position: relative;
+  padding: 0 0 18px 22px;
+  border-left: 2px solid #ece7dc;
+  margin-left: 5px;
+}
+.sd-timeline li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.sd-timeline li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d8d2c4;
+}
+.sd-timeline li.is-latest::before {
+  background: #f9b416;
+  box-shadow: 0 0 0 3px #fdf0cc;
+}
+.sd-tl-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.bo-card .sd-tl-note {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #555;
+}
+.sd-manage textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.sd-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #8a8a8a;
+}
+@media (max-width: 600px) {
+  .sd-facts {
+    grid-template-columns: 1fr;
+  }
+  .sd-title {
+    font-size: 26px;
+  }
+}
+
+/* ---- Tracking result (public /track-shipment and the dashboard view) ---- */
+.tr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tr-route {
+  margin: 18px 0 2px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+.tr-arrow {
+  color: #f9b416;
+}
+.tr-countries {
+  margin: 0;
+  font-size: 14px;
+  color: #7a7a7a;
+}
+.tr-problem {
+  margin: 20px 0 0;
+}
+.tr-progress {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: 26px 0 0;
+  padding: 0;
+}
+.tr-progress li {
+  position: relative;
+  text-align: center;
+}
+/* The connecting line between dots. */
+.tr-progress li::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: -50%;
+  width: 100%;
+  height: 3px;
+  background: #ece7dc;
+}
+.tr-progress li:first-child::before {
+  display: none;
+}
+.tr-progress li.is-done::before,
+.tr-progress li.is-current::before {
+  background: #f9b416;
+}
+.tr-dot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #ece7dc;
+  box-sizing: border-box;
+}
+.tr-progress li.is-done .tr-dot {
+  background: #f9b416;
+  border-color: #f9b416;
+}
+.tr-progress li.is-current .tr-dot {
+  border-color: #f9b416;
+  box-shadow: 0 0 0 4px #fdf0cc;
+}
+.tr-step-label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #9a9a9a;
+}
+.tr-progress li.is-done .tr-step-label,
+.tr-progress li.is-current .tr-step-label {
+  color: #1c1c1c;
+  font-weight: 700;
+}
+.tr-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 26px 0 0;
+  padding: 16px 18px;
+  background: #faf8f3;
+  border-radius: 10px;
+}
+.tr-facts dt {
+  font-size: 12px;
+  color: #7a7a7a;
+}
+.tr-facts dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.tr-section-title {
+  margin: 30px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6400;
+}
+.tr-timeline li::before {
+  background: #d8d2c4;
+  box-shadow: 0 0 0 1px #d8d2c4;
+}
+.tr-timeline li.is-latest::before {
+  background: #f9b416;
+  box-shadow: 0 0 0 1px #f9b416;
+}
+.tt-driver-note {
+  font-style: italic;
+}
+@media (max-width: 560px) {
+  .tracking-result {
+    padding: 22px 18px;
+  }
+  .tr-route {
+    font-size: 22px;
+  }
+  .tr-step-label {
+    font-size: 10.5px;
+  }
+}
+
+/* ---- Site-wide loading bar + busy buttons (components/progress-bar.tsx) ---- */
+.cp-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: linear-gradient(90deg, transparent 0%, #f9b416 30%, #00aee1 50%, #f9b416 70%, transparent 100%);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+}
+.cp-progress.is-active {
+  opacity: 1;
+  animation: cp-progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes cp-progress-slide {
+  0% { background-position: -50% 0; }
+  100% { background-position: 150% 0; }
+}
+.cp-busy {
+  pointer-events: none;
+  cursor: progress;
+  opacity: 0.75;
+  background-image: linear-gradient(110deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.45) 50%, rgba(255, 255, 255, 0) 70%) !important;
+  background-size: 200% 100% !important;
+  animation: cp-busy-shine 1.2s linear infinite;
+}
+@keyframes cp-busy-shine {
+  0% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+
+/* The tracking card inside the dashboard sits flush left, not centred. */
+.dashboard-panel .tracking-result {
+  margin: 20px 0 0;
+  max-width: none;
+}

@@ -16,11 +16,9 @@ function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc
       <div className="form-field">
         <div className="label">Country</div>
         <select className="field w-select" value={loc.country} onChange={(e) => setLoc({ country: e.target.value, city: "", postal: "" })}>
-          {label === "To" && (
-            <option value="" disabled>
-              Select country
-            </option>
-          )}
+          <option value="" disabled>
+            Select country
+          </option>
           {COUNTRIES.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -53,7 +51,7 @@ function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc
 }
 
 export function QuoteForm({ prefill }: { prefill: Record<string, string | undefined> }) {
-  const [origin, setOrigin] = useState<Loc>({ country: prefill.origin_country ?? "Nigeria", city: prefill.origin_city ?? "", postal: prefill.origin_postal ?? "" });
+  const [origin, setOrigin] = useState<Loc>({ country: prefill.origin_country ?? "", city: prefill.origin_city ?? "", postal: prefill.origin_postal ?? "" });
   const [dest, setDest] = useState<Loc>({ country: prefill.dest_country ?? "", city: prefill.dest_city ?? "", postal: prefill.dest_postal ?? "" });
   const [pkg, setPkg] = useState({
     weight: prefill.weight ?? "5",

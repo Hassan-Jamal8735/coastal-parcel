@@ -21,6 +21,7 @@ export async function getTrackingEvents(shipmentId: number) {
       lng: trackingEvents.lng,
       createdAt: trackingEvents.createdAt,
       createdByName: users.name,
+      createdByRole: users.role,
     })
     .from(trackingEvents)
     .leftJoin(users, eq(users.id, trackingEvents.createdBy))

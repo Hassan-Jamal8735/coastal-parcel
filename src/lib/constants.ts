@@ -21,10 +21,15 @@ export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
 export const statusLabel = (s: string) => SHIPMENT_STATUS_LABELS[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Statuses during which a driver's live location is meaningful. */
-export const ACTIVE_DELIVERY_STATUSES = ["assigned", "picked_up", "in_transit", "out_for_delivery"];
+export const ACTIVE_DELIVERY_STATUSES = ["paid", "assigned", "picked_up", "in_transit", "out_for_delivery"];
 
-/** Forward-only steps a driver can advance a shipment through themselves. */
+/**
+ * Forward-only steps a driver can advance a shipment through themselves. A
+ * paid shipment that has a driver is ready for pickup even if it was never
+ * marked "assigned", so the driver is never left without a next step.
+ */
 export const NEXT_DRIVER_STATUS: Record<string, string> = {
+  paid: "picked_up",
   assigned: "picked_up",
   picked_up: "in_transit",
   in_transit: "out_for_delivery",
@@ -86,5 +91,7 @@ export const BOX_PRESETS = [
 ];
 
 export function formatMoney(amount: number, currency = "NGN") {
-  return currencySymbol(currency) + amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  // Whole amounts stay whole (₦4,637,715); anything with cents shows both digits ($243.50).
+  const decimals = Number.isInteger(amount) ? 0 : 2;
+  return currencySymbol(currency) + amount.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: 2 });
 }

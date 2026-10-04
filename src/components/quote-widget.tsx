@@ -38,7 +38,7 @@ export function QuoteWidget() {
   const [curNote, setCurNote] = useState("Detecting your location…");
   const [tab, setTab] = useState<"mileage" | "location">("mileage");
   const [mileage, setMileage] = useState({ distance: "", weight: "" });
-  const [loc, setLoc] = useState({ oCountry: "Nigeria", oCity: "", oPostal: "", dCountry: "", dCity: "", dPostal: "", weight: "" });
+  const [loc, setLoc] = useState({ oCountry: "", oCity: "", oPostal: "", dCountry: "", dCity: "", dPostal: "", weight: "" });
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [lastRun, setLastRun] = useState<"mileage" | "location" | null>(null);

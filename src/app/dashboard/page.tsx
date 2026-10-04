@@ -10,6 +10,7 @@ import { shipments } from "@/db/schema";
 import { serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { flashFor } from "@/lib/flash";
+import { PhoneInput } from "@/components/phone-input";
 
 export const metadata = { title: "Dashboard" };
 
@@ -131,7 +132,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
               <div className="dashboard-form-field">
                 <label htmlFor="p-phone">Phone Number</label>
-                <input type="tel" id="p-phone" name="phone" defaultValue={user.phone ?? ""} />
+                <PhoneInput id="p-phone" name="phone" defaultValue={user.phone ?? ""} />
               </div>
               <input type="submit" className="main-button w-button" value="Save Changes" />
             </form>

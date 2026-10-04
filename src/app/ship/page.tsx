@@ -64,7 +64,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       pickupAddress: "",
       pickupCity: q.pickup_city ?? "",
       pickupPostalCode: q.pickup_postal_code ?? "",
-      pickupCountry: q.pickup_country || "Nigeria",
+      pickupCountry: q.pickup_country || "",
       receiverName: "",
       receiverPhone: "",
       deliveryAddress: "",

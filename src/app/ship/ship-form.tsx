@@ -6,6 +6,7 @@ import { ShipCardSection } from "@/components/ship-ui";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES } from "@/lib/constants";
+import { PhoneInput } from "@/components/phone-input";
 
 type PackageRow = { description: string; weight: string; pieces: string; length: string; width: string; height: string };
 
@@ -135,11 +136,9 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
               value={f[k("Country")]}
               onChange={(e) => setF((prev) => ({ ...prev, [k("Country")]: e.target.value, [k("City")]: "", [k("PostalCode")]: "" }))}
             >
-              {where === "delivery" && (
-                <option value="" disabled>
-                  Select country
-                </option>
-              )}
+              <option value="" disabled>
+                Select country
+              </option>
               {COUNTRIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -190,7 +189,7 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             </div>
             <div className="form-field">
               <div className="label">Sender Phone</div>
-              <input className="field w-input" type="tel" required value={f.senderPhone} onChange={(e) => set("senderPhone", e.target.value)} />
+              <PhoneInput className="field w-input" required value={f.senderPhone} onValueChange={(v) => set("senderPhone", v)} />
             </div>
             <div className="form-field">
               <div className="label">Sender Email</div>
@@ -213,7 +212,7 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             </div>
             <div className="form-field">
               <div className="label">Receiver Phone</div>
-              <input className="field w-input" type="tel" required value={f.receiverPhone} onChange={(e) => set("receiverPhone", e.target.value)} />
+              <PhoneInput className="field w-input" required value={f.receiverPhone} onValueChange={(v) => set("receiverPhone", v)} />
             </div>
           </div>
           {location("delivery")}
@@ -292,7 +291,7 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
         <ShipCardSection icon="tag" title="Purpose & Reference">
           <div className="form-row-2col">
             <div className="form-field">
-              <div className="label">What is the purpose of your shipment?</div>
+              <div className="label">Purpose of shipment</div>
               <select className="field w-select" required value={f.shipmentPurpose} onChange={(e) => set("shipmentPurpose", e.target.value)}>
                 <option value="" disabled>
                   Select purpose

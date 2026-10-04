@@ -10,6 +10,7 @@ import { getSessionUser, homeFor } from "@/lib/dal";
 import { sendDriverApplicationReceived, sendWelcomeCustomer } from "@/lib/email";
 import { createSession, deleteSession } from "@/lib/session";
 import { checkVerificationCode, issueVerificationCode, issueVerificationCodeIfDue, RESEND_COOLDOWN_SECONDS, resendWaitSeconds } from "@/lib/verification";
+import { normalizePhone, PHONE_ERROR } from "@/lib/phone";
 
 export type AuthFormState = { error?: string; values?: Record<string, string> } | undefined;
 
@@ -31,7 +32,7 @@ const loginSchema = z.object({
 const signupSchema = z.object({
   full_name: z.string().trim().min(1, "Please fill in all fields."),
   email: z.email("Please enter a valid email address.").trim().toLowerCase(),
-  phone: z.string().trim().min(1, "Please fill in all fields."),
+  phone: z.string().trim().refine((v) => normalizePhone(v) !== null, PHONE_ERROR).transform((v) => normalizePhone(v)!),
   password: z.string().min(8, "Password must be at least 8 characters."),
 });
 

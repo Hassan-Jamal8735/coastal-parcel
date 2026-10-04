@@ -158,7 +158,7 @@ export async function notifyCustomerStatusChange(s: Shipment, status: string) {
 
   await sendEmail({
     to: contact.email,
-    subject: `[Coastal Parcel] ${copy.subject}`,
+    subject: `${copy.subject}`,
     content: {
       preheader: copy.intro,
       heading: copy.heading,
@@ -173,7 +173,7 @@ export async function notifyCustomerStatusChange(s: Shipment, status: string) {
 export async function notifyDriverAssigned(s: Shipment, driver: { email: string; name: string }) {
   await sendEmail({
     to: driver.email,
-    subject: `[Coastal Parcel] New shipment assigned — ${s.pickupCity} → ${s.deliveryCity}`,
+    subject: `New shipment assigned — ${s.pickupCity} → ${s.deliveryCity}`,
     content: {
       preheader: `Pickup in ${s.pickupCity}, delivery to ${s.deliveryCity}.`,
       heading: "New shipment assigned to you",
@@ -197,7 +197,7 @@ export async function notifyDriverAssigned(s: Shipment, driver: { email: string;
 export async function sendVerificationCode(user: { email: string; name: string }, code: string): Promise<boolean> {
   return deliver({
     to: user.email,
-    subject: `[Coastal Parcel] Your verification code: ${code}`,
+    subject: `Your verification code: ${code}`,
     content: {
       preheader: `Your code is ${code}. It expires in 15 minutes.`,
       heading: "Verify your email address",
@@ -211,7 +211,7 @@ export async function sendVerificationCode(user: { email: string; name: string }
 export async function sendWelcomeCustomer(user: { email: string; name: string }) {
   await sendEmail({
     to: user.email,
-    subject: "[Coastal Parcel] Welcome to Coastal Parcel",
+    subject: "Welcome to Coastal Parcel",
     content: {
       preheader: "Your account is ready — book and track shipments anytime.",
       heading: "Welcome to Coastal Parcel",
@@ -227,7 +227,7 @@ export async function sendWelcomeCustomer(user: { email: string; name: string })
 export async function sendDriverApplicationReceived(user: { email: string; name: string }) {
   await sendEmail({
     to: user.email,
-    subject: "[Coastal Parcel] We've received your driver application",
+    subject: "We've received your driver application",
     content: {
       preheader: "Your application is under review.",
       heading: "Thanks for applying",
@@ -245,7 +245,7 @@ export async function sendDriverDecision(user: { email: string; name: string }, 
   const approved = status === "approved";
   await sendEmail({
     to: user.email,
-    subject: approved ? "[Coastal Parcel] Your driver application is approved" : "[Coastal Parcel] Update on your driver application",
+    subject: approved ? "Your driver application is approved" : "Update on your driver application",
     content: {
       preheader: approved ? "You can now receive shipments." : "An update on your application.",
       heading: approved ? "You're approved!" : "Application update",
@@ -260,7 +260,7 @@ export async function sendDriverDecision(user: { email: string; name: string }, 
 export async function sendStaffAccountCreated(user: { email: string; name: string }) {
   await sendEmail({
     to: user.email,
-    subject: "[Coastal Parcel] Your back office account",
+    subject: "Your back office account",
     content: {
       preheader: "You now have access to the Coastal Parcel back office.",
       heading: "Your back office account is ready",
@@ -279,7 +279,7 @@ export async function notifyContactMessage(m: { name: string; email: string; pho
   await sendEmail({
     to: process.env.ADMIN_EMAIL ?? "Info@coastalparcel.com",
     replyTo: m.email,
-    subject: `[Coastal Parcel] New contact message: ${m.subject || "No subject"}`,
+    subject: `New contact message: ${m.subject || "No subject"}`,
     content: {
       preheader: `${m.name}: ${m.message.slice(0, 90)}`,
       heading: "New contact message",
@@ -297,7 +297,7 @@ export async function notifyContactMessage(m: { name: string; email: string; pho
 
   await sendEmail({
     to: m.email,
-    subject: "[Coastal Parcel] We've received your message",
+    subject: "We've received your message",
     content: {
       preheader: "Thanks for reaching out — we'll get back to you soon.",
       heading: "We've received your message",

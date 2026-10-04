@@ -6,7 +6,7 @@ import { ConfirmSubmit } from "@/components/confirm-submit";
 import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
-import { SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { emailProvider } from "@/lib/email";
 import { paystackReady, stripeReady } from "@/lib/payments";
 import { getPricingSettings } from "@/lib/pricing";
@@ -147,61 +147,126 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
     .filter((e) => e.lat != null && e.lng != null)
     .map((e) => ({ lat: Number(e.lat), lng: Number(e.lng), label: `${statusLabel(e.status)} — ${formatDateTime(e.createdAt, false)}` }));
 
+  const purpose = SHIPMENT_PURPOSES[s.shipmentPurpose as keyof typeof SHIPMENT_PURPOSES] ?? s.shipmentPurpose;
+  const charged = s.chargeCurrency && s.chargeAmount != null && s.chargeCurrency !== "NGN" ? ` (charged ${formatMoney(s.chargeAmount, s.chargeCurrency)})` : "";
+
   return (
     <>
-      <p><Link href="/backoffice?panel=shipments">&larr; Back to all shipments</Link></p>
-      <h2>Shipment #{s.id} {s.trackingNumber && <code>{s.trackingNumber}</code>}</h2>
+      <p className="sd-back">
+        <Link href="/backoffice?panel=shipments">&larr; All shipments</Link>
+      </p>
+      <div className="sd-header">
+        <div>
+          <h2 className="sd-title">Shipment #{s.id}</h2>
+          <div className="sd-sub">
+            <StatusBadge status={s.status} />
+            {s.trackingNumber && <span className="shipment-tracking-number">{s.trackingNumber}</span>}
+            <span className="sd-muted">Booked {formatDateTime(s.createdAt)}</span>
+          </div>
+        </div>
+        {s.trackingNumber && (
+          <Link href={`/track-shipment?tracking=${s.trackingNumber}`} className="sd-header-link" target="_blank">
+            View public tracking &rarr;
+          </Link>
+        )}
+      </div>
       {saved && <div className="dashboard-success">Shipment updated.</div>}
 
       <div className="bo-grid">
         <div className="bo-col-main">
-          <div className="bo-card">
-            <h3>Customer &amp; Route</h3>
-            <p>
-              <strong>Customer:</strong>{" "}
-              {row.customerName ? `${row.customerName} (${row.customerEmail})` : `Guest checkout (${s.senderEmail ?? "no email"})`}
+          <section className="bo-card">
+            <h3 className="sd-card-title">Customer &amp; route</h3>
+            <p className="sd-customer">
+              {row.customerName ? (
+                <>
+                  <strong>{row.customerName}</strong> <span className="sd-muted">· {row.customerEmail}</span>
+                </>
+              ) : (
+                <>
+                  <strong>Guest checkout</strong> <span className="sd-muted">· {s.senderEmail ?? "no email"}</span>
+                </>
+              )}
             </p>
-            <p><strong>Sender:</strong> {s.senderName} — {s.senderPhone}</p>
-            <p><strong>Pickup:</strong> {s.pickupAddress}, {s.pickupCity}{s.pickupPostalCode ? ` ${s.pickupPostalCode}` : ""}, {s.pickupCountry}</p>
-            <p><strong>Receiver:</strong> {s.receiverName} — {s.receiverPhone}</p>
-            <p><strong>Delivery:</strong> {s.deliveryAddress}, {s.deliveryCity}{s.deliveryPostalCode ? ` ${s.deliveryPostalCode}` : ""}, {s.deliveryCountry}</p>
-          </div>
+            <div className="shipment-pickup-delivery sd-route">
+              <div>
+                <p className="shipment-pd-label">Pickup from</p>
+                <p className="sd-strong">{s.senderName}</p>
+                <p className="sd-muted">{s.senderPhone}</p>
+                <p>
+                  {s.pickupAddress}
+                  <br />
+                  {s.pickupCity}
+                  {s.pickupPostalCode ? ` ${s.pickupPostalCode}` : ""}, {s.pickupCountry}
+                </p>
+              </div>
+              <div>
+                <p className="shipment-pd-label">Deliver to</p>
+                <p className="sd-strong">{s.receiverName}</p>
+                <p className="sd-muted">{s.receiverPhone}</p>
+                <p>
+                  {s.deliveryAddress}
+                  <br />
+                  {s.deliveryCity}
+                  {s.deliveryPostalCode ? ` ${s.deliveryPostalCode}` : ""}, {s.deliveryCountry}
+                </p>
+              </div>
+            </div>
+          </section>
 
-          <div className="bo-card">
-            <h3>Package &amp; Payment</h3>
-            <p>
-              <strong>Service:</strong> {serviceLabel(s.serviceType ?? "")} &middot; <strong>Ships:</strong> {s.isDocument ? "Document" : "Package"} &middot;{" "}
-              <strong>Pieces:</strong> {s.packagePieces || 1} &middot; <strong>Total Weight:</strong> {s.packageWeight} kg
-            </p>
-            <p>
-              <strong>Purpose:</strong> {SHIPMENT_PURPOSES[s.shipmentPurpose as keyof typeof SHIPMENT_PURPOSES] ?? s.shipmentPurpose ?? "—"}
-              {s.shipmentReference && <> &middot; <strong>Ref:</strong> {s.shipmentReference}</>}
-            </p>
-            <p>
-              <strong>Price:</strong> {naira(s.priceAmount)} &middot; <strong>Payment:</strong> {ucfirst(s.paymentStatus)} {s.paymentGateway && `(${s.paymentGateway})`}
-            </p>
-            {s.paymentReference && <p><strong>Reference:</strong> {s.paymentReference}</p>}
-            {s.notes && <p><strong>Customer notes:</strong> {s.notes}</p>}
-          </div>
+          <section className="bo-card">
+            <h3 className="sd-card-title">Package &amp; payment</h3>
+            <dl className="sd-facts">
+              <Fact label="Service">{serviceLabel(s.serviceType ?? "") || "—"}</Fact>
+              <Fact label="Contents">{s.isDocument ? "Document" : "Package"}</Fact>
+              <Fact label="Pieces">{s.packagePieces || 1}</Fact>
+              <Fact label="Total weight">{s.packageWeight} kg</Fact>
+              <Fact label="Purpose">{purpose || "—"}</Fact>
+              <Fact label="Reference">{s.shipmentReference || "—"}</Fact>
+              <Fact label="Price">
+                {naira(s.priceAmount)}
+                {charged}
+              </Fact>
+              <Fact label="Payment">
+                {ucfirst(s.paymentStatus)}
+                {s.paymentGateway && <span className="sd-muted"> · {s.paymentGateway}</span>}
+              </Fact>
+              {s.paymentReference && (
+                <Fact label="Payment reference" wide>
+                  <code className="sd-code">{s.paymentReference}</code>
+                </Fact>
+              )}
+              {s.notes && (
+                <Fact label="Customer notes" wide>
+                  {s.notes}
+                </Fact>
+              )}
+            </dl>
+          </section>
 
           {s.customsItemDescription && (
-            <div className="bo-card">
-              <h3>Customs Invoice</h3>
-              <p>
-                <strong>Item:</strong> {s.customsItemDescription}
-                {s.customsCommodityCode && ` (${s.customsCommodityCode})`} &middot; <strong>Origin:</strong> {s.customsCountryOfOrigin}
-              </p>
-              <p>
-                <strong>Declared Value:</strong> &#8358;
-                {(s.customsDeclaredValueNgn ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              {s.customsRemarks && <p><strong>Remarks:</strong> {s.customsRemarks}</p>}
-            </div>
+            <section className="bo-card">
+              <h3 className="sd-card-title">Customs invoice</h3>
+              <dl className="sd-facts">
+                <Fact label="Item">
+                  {s.customsItemDescription}
+                  {s.customsCommodityCode && <span className="sd-muted"> ({s.customsCommodityCode})</span>}
+                </Fact>
+                <Fact label="Origin">{s.customsCountryOfOrigin || "—"}</Fact>
+                <Fact label="Declared value">
+                  &#8358;{(s.customsDeclaredValueNgn ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Fact>
+                {s.customsRemarks && (
+                  <Fact label="Remarks" wide>
+                    {s.customsRemarks}
+                  </Fact>
+                )}
+              </dl>
+            </section>
           )}
 
           {(s.pickupPhotoUrl || s.deliveryPhotoUrl) && (
-            <div className="bo-card">
-              <h3>Delivery Photos</h3>
+            <section className="bo-card">
+              <h3 className="sd-card-title">Photos</h3>
               <div className="shipment-photos">
                 {s.pickupPhotoUrl && (
                   <a href={s.pickupPhotoUrl} target="_blank" rel="noopener noreferrer">
@@ -218,12 +283,12 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
                   </a>
                 )}
               </div>
-            </div>
+            </section>
           )}
 
           {(points.length > 0 || live) && (
-            <div className="bo-card">
-              <h3>Location{live ? " (live)" : " Checkpoints"}</h3>
+            <section className="bo-card">
+              <h3 className="sd-card-title">{live ? "Live location" : "Location checkpoints"}</h3>
               {live && (
                 <p className="cp-live-location-note">
                   <span className="cp-live-dot" />
@@ -231,63 +296,77 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
                 </p>
               )}
               <TrackingMap points={points} live={live} radius={8} />
-            </div>
+            </section>
           )}
 
-          <div className="bo-card">
-            <h3>Tracking Timeline</h3>
+          <section className="bo-card">
+            <h3 className="sd-card-title">Timeline</h3>
             {events.length === 0 ? (
-              <p>No events yet.</p>
+              <p className="sd-muted">No events yet.</p>
             ) : (
-              <table className="bo-table">
-                <thead><tr><th>Status</th><th>Note</th><th>By</th><th>When</th></tr></thead>
-                <tbody>
-                  {[...events].reverse().map((e) => (
-                    <tr key={e.id}>
-                      <td><strong>{statusLabel(e.status)}</strong></td>
-                      <td>{e.note}</td>
-                      <td>{e.createdByName ?? "System"}</td>
-                      <td>{formatDateTime(e.createdAt, false)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <ol className="sd-timeline">
+                {[...events].reverse().map((e, i) => (
+                  <li key={e.id} className={i === 0 ? "is-latest" : ""}>
+                    <div className="sd-tl-head">
+                      <strong>{statusLabel(e.status)}</strong>
+                      <span className="sd-muted">
+                        {formatDateTime(e.createdAt)} · {e.createdByName ?? "System"}
+                      </span>
+                    </div>
+                    {e.note && <p className="sd-tl-note">{e.note}</p>}
+                  </li>
+                ))}
+              </ol>
             )}
-          </div>
+          </section>
         </div>
 
         <div className="bo-col-side">
-          <div className="bo-card">
-            <h3>Manage</h3>
-            <form action={boSaveShipment}>
+          <section className="bo-card">
+            <h3 className="sd-card-title">Manage</h3>
+            <form action={boSaveShipment} className="sd-manage">
               <input type="hidden" name="shipment_id" value={s.id} />
               <div className="dashboard-form-field">
                 <label htmlFor="bo-status">Status</label>
                 <select id="bo-status" name="status" defaultValue={s.status}>
                   {Object.entries(SHIPMENT_STATUS_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="dashboard-form-field">
-                <label htmlFor="bo-driver">Assigned Driver</label>
+                <label htmlFor="bo-driver">Assigned driver</label>
                 <select id="bo-driver" name="driver_id" defaultValue={s.driverId ?? ""}>
                   <option value="">No driver</option>
                   {approvedDrivers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
                   ))}
                 </select>
+                <p className="sd-hint">Assigning a driver moves a paid shipment to &ldquo;Assigned&rdquo; and emails the driver.</p>
               </div>
               <div className="dashboard-form-field">
                 <label htmlFor="bo-note">Note (optional)</label>
-                <textarea id="bo-note" name="note" rows={3} />
+                <textarea id="bo-note" name="note" rows={3} placeholder="Added to the timeline" />
               </div>
-              <input type="submit" className="main-button w-button" style={{ width: "100%" }} value="Save Changes" />
+              <input type="submit" className="main-button w-button" style={{ width: "100%" }} value="Save changes" />
             </form>
-          </div>
+          </section>
         </div>
       </div>
     </>
+  );
+}
+
+function Fact({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={"sd-fact" + (wide ? " is-wide" : "")}>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
   );
 }
 

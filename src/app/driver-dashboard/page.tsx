@@ -13,6 +13,7 @@ import { shipments } from "@/db/schema";
 import { ACTIVE_DELIVERY_STATUSES, NEXT_DRIVER_STATUS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { flashFor } from "@/lib/flash";
+import { PhoneInput } from "@/components/phone-input";
 
 export const metadata = { title: "Driver Dashboard" };
 
@@ -197,7 +198,7 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
               </div>
               <div className="dashboard-form-field">
                 <label htmlFor="p-phone">Phone Number</label>
-                <input type="tel" id="p-phone" name="phone" defaultValue={user.phone ?? ""} />
+                <PhoneInput id="p-phone" name="phone" defaultValue={user.phone ?? ""} />
               </div>
               <div className="dashboard-form-field">
                 <label htmlFor="p-vehicle">Vehicle Type</label>

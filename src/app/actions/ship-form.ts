@@ -9,6 +9,7 @@ import { SHIPMENT_PURPOSES } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/dal";
 import { calculateFinalPrice, getPricingSettings, LocationError, locationDistanceKm } from "@/lib/pricing";
 import { aggregatePackages, canAccessShipment, getShipment, newGuestToken, setGuestCookie } from "@/lib/shipments";
+import { normalizePhone } from "@/lib/phone";
 
 const optionalNumber = z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nonnegative().nullable());
 
@@ -27,14 +28,14 @@ const shipmentSchema = z.object({
   shippingDate: z.string().optional(),
   isDocument: z.boolean().default(false),
   senderName: z.string().trim().min(1, "Please enter the sender's name."),
-  senderPhone: z.string().trim().min(5, "Please enter the sender's phone number."),
+  senderPhone: z.string().trim().refine((v) => normalizePhone(v) !== null, "Please enter a valid sender phone number (digits only, optional + country code).").transform((v) => normalizePhone(v)!),
   senderEmail: z.email("Please enter a valid sender email — it's used for your receipt and checkout.").trim(),
   pickupAddress: z.string().trim().min(1, "Please enter the pickup address."),
   pickupCity: z.string().trim().min(1, "Please enter the pickup city."),
   pickupPostalCode: z.string().trim().max(20).default(""),
   pickupCountry: z.string().trim().min(1, "Please choose the pickup country."),
   receiverName: z.string().trim().min(1, "Please enter the receiver's name."),
-  receiverPhone: z.string().trim().min(5, "Please enter the receiver's phone number."),
+  receiverPhone: z.string().trim().refine((v) => normalizePhone(v) !== null, "Please enter a valid receiver phone number (digits only, optional + country code).").transform((v) => normalizePhone(v)!),
   deliveryAddress: z.string().trim().min(1, "Please enter the delivery address."),
   deliveryCity: z.string().trim().min(1, "Please enter the delivery city."),
   deliveryPostalCode: z.string().trim().max(20).default(""),
