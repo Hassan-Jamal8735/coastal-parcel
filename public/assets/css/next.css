@@ -673,3 +673,137 @@
     font-size: 19px;
   }
 }
+
+/* ---- Dashboard navigation on phones/tablets (≤991px, where the header
+   collapses too): a compact header row — who you are, Track, Log Out —
+   above one swipeable row of pill tabs, instead of the stacked desktop
+   sidebar. Same markup for the customer, driver and backoffice sidebars. ---- */
+@media (max-width: 991px) {
+  .dashboard-sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "user track out"
+      "nav nav nav";
+    align-items: center;
+    column-gap: 8px;
+    padding: 14px 0 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  }
+  .dashboard-user {
+    grid-area: user;
+    min-width: 0;
+    padding: 0 0 0 16px;
+    margin: 0;
+    border: 0;
+  }
+  .dashboard-user-name {
+    font-size: 15px;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dashboard-user-role {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    /* A guest's long "checking out as a guest…" line stays on one line. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dashboard-nav-divider {
+    display: none;
+  }
+
+  /* Main sections: one horizontally scrolling row of pills. */
+  .dashboard-sidebar > .dashboard-nav:not(.dashboard-nav-secondary) {
+    grid-area: nav;
+    flex-direction: row;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 0 16px 2px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dashboard-sidebar > .dashboard-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .dashboard-sidebar > .dashboard-nav:not(.dashboard-nav-secondary) .dashboard-nav-link {
+    flex: 0 0 auto;
+    width: auto;
+    scroll-snap-align: start;
+    padding: 8px 14px;
+    border: 1px solid #3a3a3a;
+    border-radius: 999px;
+    background: #262626;
+    color: #d6d6d6;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .dashboard-sidebar > .dashboard-nav:not(.dashboard-nav-secondary) .dashboard-nav-link.active {
+    background: #f9b416;
+    border-color: #f9b416;
+    color: #1c1c1c;
+  }
+
+  /* Track a Shipment + Log Out: small buttons on the header row. */
+  .dashboard-nav-secondary {
+    grid-area: track;
+    flex-direction: row;
+    overflow: visible;
+  }
+  .dashboard-nav-secondary .dashboard-nav-link,
+  .dashboard-nav-bottom a,
+  .dashboard-nav-bottom .cp-link-button {
+    display: inline-block;
+    width: auto;
+    padding: 6px 12px;
+    border: 1px solid #3a3a3a;
+    border-radius: 999px;
+    background: transparent;
+    color: #d6d6d6;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .dashboard-nav-secondary .dashboard-nav-link:hover,
+  .dashboard-nav-bottom a:hover,
+  .dashboard-nav-bottom .cp-link-button:hover {
+    border-color: #f9b416;
+    color: #fff;
+    background: transparent;
+  }
+  .dashboard-nav-bottom {
+    grid-area: out;
+    margin: 0;
+    padding: 0 16px 0 0;
+    border: 0;
+  }
+  .dashboard-nav-bottom form {
+    margin: 0;
+  }
+}
+
+/* Very narrow phones: shorten "Track a Shipment" to save room. */
+@media (max-width: 400px) {
+  .dashboard-nav-secondary .dashboard-nav-link {
+    font-size: 0;
+  }
+  .dashboard-nav-secondary .dashboard-nav-link::after {
+    content: "Track";
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 991px) {
+  /* Fade the right edge so it's clear the tab row scrolls. */
+  .dashboard-sidebar > .dashboard-nav:not(.dashboard-nav-secondary) {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    padding-right: 32px;
+  }
+}

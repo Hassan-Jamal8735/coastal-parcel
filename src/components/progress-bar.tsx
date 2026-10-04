@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { revealActiveTab } from "./panel-switcher";
 
 /**
  * Site-wide loading indicator: a bar across the top of the screen while a
@@ -72,6 +73,9 @@ export function ProgressBar() {
       document.removeEventListener("submit", onSubmit);
     };
   }, []);
+
+  // Each new page: bring the active dashboard tab into view on phones.
+  useEffect(() => revealActiveTab(), [url]);
 
   const busy = actions > 0 || navigating;
 
