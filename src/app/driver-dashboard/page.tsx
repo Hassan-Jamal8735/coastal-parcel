@@ -27,6 +27,44 @@ function whatsappLink(phone: string, message: string) {
   return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}` : "";
 }
 
+/** The driver's journey for the progress bar, and how many steps each status has completed. */
+const DRIVER_STEPS = ["Picked up", "In transit", "Out for delivery", "Delivered"];
+const DRIVER_STEP_DONE: Record<string, number> = { paid: 0, assigned: 0, picked_up: 1, in_transit: 2, out_for_delivery: 3, delivered: 4 };
+
+/** One stop on the route (A = pickup, B = delivery) with one-tap call, WhatsApp and directions. */
+function Stop({ pin, label, current, name, phone, address, message }: { pin: string; label: string; current: boolean; name: string; phone: string; address: string; message: string }) {
+  const wa = whatsappLink(phone, message);
+  const digits = phone.replace(/[^\d+]/g, "");
+  return (
+    <div className={"dv-stop" + (current ? " is-current" : "")}>
+      <span className="dv-pin">{pin}</span>
+      <div className="dv-stop-body">
+        <p className="dv-stop-label">
+          {label}
+          {current && <span className="dv-next-tag">Next stop</span>}
+        </p>
+        <p className="dv-stop-name">{name}</p>
+        <p className="dv-stop-addr">{address}</p>
+        <div className="dv-actions">
+          {digits && (
+            <a href={`tel:${digits}`} className="dv-chip">
+              Call
+            </a>
+          )}
+          {wa && (
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="dv-chip dv-chip-wa">
+              WhatsApp
+            </a>
+          )}
+          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer" className="dv-chip">
+            Directions
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function DriverDashboardPage({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   const user = await requireRole("driver");
   const { msg } = await searchParams;
@@ -104,66 +142,81 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
               <div className="shipment-list">
                 {list.map((s) => {
                   const ref = s.trackingNumber || `#${s.id}`;
-                  const senderWa = whatsappLink(s.senderPhone, `Hi ${s.senderName}, this is your Coastal Parcel driver regarding shipment ${ref}.`);
-                  const receiverWa = whatsappLink(s.receiverPhone, `Hi ${s.receiverName}, this is your Coastal Parcel driver regarding shipment ${ref}.`);
                   const next = NEXT_DRIVER_STATUS[s.status];
+                  const done = DRIVER_STEP_DONE[s.status] ?? 0;
+                  const headingToDelivery = done >= 1;
                   return (
-                    <div key={s.id} className="shipment-card">
-                      <div className="shipment-card-header">
+                    <article key={s.id} className="dv-card">
+                      <header className="dv-head">
+                        <div>
+                          <div className="dv-ref">
+                            <span className="shipment-tracking-number">{ref}</span>
+                            <span className="dv-date">
+                              {s.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SITE_TIMEZONE })}
+                            </span>
+                          </div>
+                          <h3 className="dv-route">
+                            {s.pickupCity} <span className="tr-arrow">&rarr;</span> {s.deliveryCity}
+                          </h3>
+                          <p className="dv-meta">
+                            {serviceLabel(s.serviceType ?? "")} &middot; {s.packageWeight} kg
+                            {s.packagePieces > 1 && <> &middot; {s.packagePieces} pieces</>}
+                            {s.isDocument && <> &middot; Document</>}
+                          </p>
+                        </div>
                         <span className={`shipment-status-badge status-${s.status}`}>{statusLabel(s.status)}</span>
-                        <span className="shipment-date">
-                          {s.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SITE_TIMEZONE })}
-                        </span>
-                      </div>
-                      <p className="shipment-route">
-                        <strong>{s.pickupCity}</strong> &rarr; <strong>{s.deliveryCity}</strong>
-                      </p>
-                      <p className="shipment-meta">
-                        {serviceLabel(s.serviceType ?? "")} &middot; {s.packageWeight} kg
-                        {s.packagePieces > 1 && <> &middot; {s.packagePieces} pieces</>}
-                      </p>
+                      </header>
 
-                      <div className="shipment-pickup-delivery">
-                        <div>
-                          <p className="shipment-pd-label">Pickup from</p>
-                          <p className="shipment-meta">
-                            <strong>{s.senderName}</strong> ({s.senderPhone})
-                          </p>
-                          <p className="shipment-meta">
-                            {s.pickupAddress}, {s.pickupCity}, {s.pickupCountry}
-                          </p>
-                          {senderWa && (
-                            <a href={senderWa} target="_blank" rel="noopener noreferrer" className="whatsapp-contact-link">WhatsApp Sender</a>
-                          )}
-                        </div>
-                        <div>
-                          <p className="shipment-pd-label">Deliver to</p>
-                          <p className="shipment-meta">
-                            <strong>{s.receiverName}</strong> ({s.receiverPhone})
-                          </p>
-                          <p className="shipment-meta">
-                            {s.deliveryAddress}, {s.deliveryCity}, {s.deliveryCountry}
-                          </p>
-                          {receiverWa && (
-                            <a href={receiverWa} target="_blank" rel="noopener noreferrer" className="whatsapp-contact-link">WhatsApp Receiver</a>
-                          )}
-                        </div>
+                      {!["failed", "cancelled", "returned"].includes(s.status) && (
+                        <ol className="tr-progress dv-progress" aria-label="Delivery progress">
+                          {DRIVER_STEPS.map((label, i) => (
+                            <li key={label} className={i < done ? "is-done" : i === done ? "is-current" : ""}>
+                              <span className="tr-dot" />
+                              <span className="tr-step-label">{label}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+
+                      <div className="dv-stops">
+                        <Stop
+                          pin="A"
+                          label="Pickup"
+                          current={!headingToDelivery}
+                          name={s.senderName}
+                          phone={s.senderPhone}
+                          address={`${s.pickupAddress}, ${s.pickupCity}, ${s.pickupCountry}`}
+                          message={`Hi ${s.senderName}, this is your Coastal Parcel driver regarding shipment ${ref}.`}
+                        />
+                        <Stop
+                          pin="B"
+                          label="Delivery"
+                          current={headingToDelivery && s.status !== "delivered"}
+                          name={s.receiverName}
+                          phone={s.receiverPhone}
+                          address={`${s.deliveryAddress}, ${s.deliveryCity}, ${s.deliveryCountry}`}
+                          message={`Hi ${s.receiverName}, this is your Coastal Parcel driver regarding shipment ${ref}.`}
+                        />
                       </div>
 
-                      {s.notes && <p className="shipment-note">Customer note: {s.notes}</p>}
+                      {s.notes && (
+                        <p className="dv-note">
+                          <strong>Customer note:</strong> {s.notes}
+                        </p>
+                      )}
 
                       {(s.pickupPhotoUrl || s.deliveryPhotoUrl) && (
                         <div className="shipment-photos">
                           {s.pickupPhotoUrl && (
                             <a href={s.pickupPhotoUrl} target="_blank" rel="noopener noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded Blob URL, shown as-is like WordPress */}
+                              {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded Blob URL */}
                               <img src={s.pickupPhotoUrl} alt="Pickup photo" />
                               <span>Pickup</span>
                             </a>
                           )}
                           {s.deliveryPhotoUrl && (
                             <a href={s.deliveryPhotoUrl} target="_blank" rel="noopener noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded Blob URL, shown as-is like WordPress */}
+                              {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded Blob URL */}
                               <img src={s.deliveryPhotoUrl} alt="Delivery photo" />
                               <span>Delivery</span>
                             </a>
@@ -174,9 +227,9 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
                       {next ? (
                         <DriverStatusForm action={driverUpdateStatus} shipmentId={s.id} nextStatus={next} nextLabel={statusLabel(next)} />
                       ) : s.status === "delivered" ? (
-                        <p className="shipment-note" style={{ color: "#1e7e42", background: "#eafaf1" }}>Delivered.</p>
+                        <p className="dv-done">&#10003; Delivered &mdash; nothing more to do.</p>
                       ) : null}
-                    </div>
+                    </article>
                   );
                 })}
               </div>

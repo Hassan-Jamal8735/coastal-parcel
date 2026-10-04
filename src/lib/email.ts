@@ -26,13 +26,6 @@ export async function sendEmail(message: Message) {
   }
 }
 
-/** Which way email is sent right now — shown in the backoffice so a missing key is obvious. */
-export function emailProvider(): "resend" | "smtp" | null {
-  if (process.env.RESEND_API_KEY) return "resend";
-  if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) return "smtp";
-  return null;
-}
-
 /** Sends now and reports whether it worked — returns false on any failure or when email isn't configured. */
 async function deliver({ to, subject, content, replyTo }: Message): Promise<boolean> {
   const { html, text } = renderEmail(content);

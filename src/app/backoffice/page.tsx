@@ -21,7 +21,7 @@ const PANELS = [
   ["shipments", "Shipments"],
   ["customers", "Customers"],
   ["drivers", "Drivers"],
-  ["pricing", "Pricing & Payment"],
+  ["pricing", "Pricing"],
   ["reports", "Reports"],
   ["messages", "Messages"],
   ["staff", "Staff Accounts"],

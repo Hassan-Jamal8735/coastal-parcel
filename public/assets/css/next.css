@@ -403,3 +403,273 @@
   margin: 20px 0 0;
   max-width: none;
 }
+
+/* ---- Driver dashboard shipment card ---- */
+.dv-card {
+  background: #fff;
+  border: 1px solid #e7e2d8;
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.dv-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.dv-ref {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dv-date {
+  font-size: 12.5px;
+  color: #9a9a9a;
+}
+.dv-route {
+  margin: 10px 0 2px;
+  font-size: 22px;
+  line-height: 1.25;
+}
+.dv-meta {
+  margin: 0;
+  font-size: 13.5px;
+  color: #7a7a7a;
+}
+.dv-progress {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 20px 0 4px;
+}
+.dv-stops {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+.dv-stop {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border: 1.5px solid #ece7dc;
+  border-radius: 12px;
+  background: #faf8f3;
+  min-width: 0;
+}
+.dv-stop.is-current {
+  border-color: #f9b416;
+  background: #fffaf0;
+}
+.dv-pin {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #1c1c1c;
+}
+.dv-stop.is-current .dv-pin {
+  background: #f9b416;
+  color: #1c1c1c;
+}
+.dv-stop-body {
+  min-width: 0;
+}
+.dv-stop-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6400;
+}
+.dv-next-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f9b416;
+  color: #1c1c1c;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.dv-stop-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1c1c1c;
+}
+.dv-stop-addr {
+  margin: 2px 0 10px;
+  font-size: 13.5px;
+  color: #555;
+  overflow-wrap: anywhere;
+}
+.dv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dv-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #ddd6c8;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1c1c1c;
+  text-decoration: none;
+}
+.dv-chip:hover {
+  border-color: #f9b416;
+  color: #1c1c1c;
+}
+.dv-chip-wa {
+  border-color: #b6e7c7;
+  background: #eefaf2;
+  color: #1e7e42;
+}
+.dv-note {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fdf6e3;
+  font-size: 13.5px;
+  color: #6b5200;
+}
+.dv-done {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eafaf1;
+  color: #1e7e42;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Action area */
+.driver-status-form.dv-form {
+  display: block;
+  margin-top: 18px;
+  padding: 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #faf8f3;
+}
+.dv-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dv-form-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.dv-geo {
+  margin: 0;
+  font-size: 12px;
+  color: #9a9a9a;
+}
+.dv-geo.is-on {
+  color: #1e7e42;
+}
+.dv-geo.is-on::before {
+  content: "\25CF  ";
+}
+.dv-form-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.dv-form-fields.has-photo {
+  grid-template-columns: 1fr 200px;
+}
+.dv-form .dv-form-fields textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: #fff;
+  min-height: 64px;
+}
+.dv-photo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1.5px dashed #d8cfba;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.dv-photo:hover {
+  border-color: #f9b416;
+}
+.dv-photo.has-file {
+  border-style: solid;
+  border-color: #8fd3a8;
+  background: #f2fbf5;
+}
+.dv-photo input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dv-photo-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1c1c1c;
+}
+.dv-photo-sub {
+  font-size: 12px;
+  color: #8a8a8a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-primary {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 20px;
+  font-size: 16px;
+}
+.dv-failed {
+  display: block;
+  margin: 10px auto 0;
+  padding: 4px 8px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b3401f;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 680px) {
+  .dv-card {
+    padding: 18px 16px;
+  }
+  .dv-stops,
+  .dv-form-fields.has-photo {
+    grid-template-columns: 1fr;
+  }
+  .dv-route {
+    font-size: 19px;
+  }
+}
