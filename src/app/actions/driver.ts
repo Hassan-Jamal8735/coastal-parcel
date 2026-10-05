@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/dal";
 import { notifyCustomerStatusChange } from "@/lib/email";
 import { uploadImage } from "@/lib/blob";
 import { addTrackingEvent, getShipment } from "@/lib/shipments";
+import { env } from "@/lib/env";
 
 function fail(code: string): never {
   redirect(`/driver-dashboard?msg=${code}#shipments`);
@@ -47,7 +48,7 @@ export async function driverUpdateStatus(formData: FormData) {
       else update.deliveryPhotoUrl = url;
     } catch {
       // A failed pickup photo is not a blocker; a failed proof of delivery is.
-      if (next === "delivered") fail(process.env.BLOB_READ_WRITE_TOKEN ? "driver_upload_failed" : "driver_upload_unconfigured");
+      if (next === "delivered") fail(env("BLOB_READ_WRITE_TOKEN") ? "driver_upload_failed" : "driver_upload_unconfigured");
     }
   }
 

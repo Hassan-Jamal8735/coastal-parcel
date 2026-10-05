@@ -6,6 +6,7 @@ import { users } from "@/db/schema";
 import { formatMoney, serviceLabel, statusLabel } from "./constants";
 import { renderEmail, SITE, type EmailContent } from "./email-template";
 import type { Shipment } from "./shipments";
+import { env } from "@/lib/env";
 
 type Message = { to: string; subject: string; content: EmailContent; replyTo?: string };
 
@@ -29,14 +30,14 @@ export async function sendEmail(message: Message) {
 /** Sends now and reports whether it worked — returns false on any failure or when email isn't configured. */
 async function deliver({ to, subject, content, replyTo }: Message): Promise<boolean> {
   const { html, text } = renderEmail(content);
-  const key = process.env.RESEND_API_KEY;
+  const key = env("RESEND_API_KEY");
   try {
     if (key) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM ?? "Coastal Parcel <noreply@coastalparcel.com>",
+          from: env("EMAIL_FROM") ?? "Coastal Parcel <noreply@coastalparcel.com>",
           to,
           subject,
           html,
@@ -49,16 +50,16 @@ async function deliver({ to, subject, content, replyTo }: Message): Promise<bool
         return false;
       }
       return true;
-    } else if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
+    } else if (env("MAIL_HOST") && env("MAIL_USERNAME")) {
       const nodemailer = await import("nodemailer");
-      const port = Number(process.env.MAIL_PORT ?? 587);
+      const port = Number(env("MAIL_PORT") ?? 587);
       const transport = nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
+        host: env("MAIL_HOST"),
         port,
         secure: port === 465, // 587 upgrades to TLS via STARTTLS
-        auth: { user: process.env.MAIL_USERNAME, pass: process.env.MAIL_PASSWORD },
+        auth: { user: env("MAIL_USERNAME"), pass: env("MAIL_PASSWORD") },
       });
-      const from = process.env.MAIL_FROM_ADDRESS ?? process.env.MAIL_USERNAME;
+      const from = env("MAIL_FROM_ADDRESS") ?? env("MAIL_USERNAME");
       await transport.sendMail({ from: `Coastal Parcel <${from}>`, to, subject, html, text, replyTo });
       return true;
     } else {
@@ -270,7 +271,7 @@ export async function sendStaffAccountCreated(user: { email: string; name: strin
 
 export async function notifyContactMessage(m: { name: string; email: string; phone: string; subject: string; message: string }) {
   await sendEmail({
-    to: process.env.ADMIN_EMAIL ?? "Info@coastalparcel.com",
+    to: env("ADMIN_EMAIL") ?? "Info@coastalparcel.com",
     replyTo: m.email,
     subject: `New contact message: ${m.subject || "No subject"}`,
     content: {

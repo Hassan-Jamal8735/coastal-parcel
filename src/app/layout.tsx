@@ -2,11 +2,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ProgressBar } from "@/components/progress-bar";
+import { siteUrl } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: { default: "Coastal Parcel", template: "%s – Coastal Parcel" },
   description: "Trusted global logistics, delivered with care. Get a quote, ship, and track parcels worldwide.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://coastalparcel.com"),
+  metadataBase: new URL(siteUrl()),
 };
 
 // Same stylesheets the WordPress theme loaded, in the same order, served

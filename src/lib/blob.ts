@@ -1,5 +1,6 @@
 import "server-only";
 import { put } from "@vercel/blob";
+import { env } from "@/lib/env";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -15,9 +16,9 @@ export async function uploadImage(file: FormDataEntryValue | null, folder: strin
   if (!(file instanceof File) || file.size === 0) return null;
   if (!ALLOWED.includes(file.type)) throw new UploadError("Please upload a JPG, PNG, WebP or GIF image.");
   if (file.size > MAX_BYTES) throw new UploadError("Images must be 2 MB or smaller.");
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!env("BLOB_READ_WRITE_TOKEN")) {
     throw new UploadError("File uploads aren't set up yet (missing Vercel Blob token). Please continue without the file for now.");
   }
-  const blob = await put(`${folder}/${file.name}`, file, { access: "public", addRandomSuffix: true });
+  const blob = await put(`${folder}/${file.name}`, file, { access: "public", addRandomSuffix: true, token: env("BLOB_READ_WRITE_TOKEN") });
   return blob.url;
 }

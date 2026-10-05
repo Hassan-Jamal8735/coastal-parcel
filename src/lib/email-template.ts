@@ -1,3 +1,5 @@
+import { env, siteUrl } from "./env";
+
 /**
  * Branded HTML email layout. Table-based with inline styles, because email
  * clients (Gmail, Outlook, Apple Mail) ignore most modern CSS; a single
@@ -5,7 +7,7 @@
  * previewed or tested in isolation.
  */
 
-export const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://coastalparcel.com").replace(/\/$/, "");
+export const SITE = siteUrl();
 
 /**
  * Where email images load from: the live site's final address (www — the bare
@@ -13,7 +15,7 @@ export const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://coastalparcel.
  * Never localhost, which mail clients can't reach, so emails sent from a local
  * or preview build still show the logo.
  */
-const ASSET_BASE = process.env.EMAIL_ASSET_URL ?? "https://www.coastalparcel.com";
+const ASSET_BASE = env("EMAIL_ASSET_URL") ?? "https://www.coastalparcel.com";
 
 const YELLOW = "#F9B416";
 const DARK = "#0d0d0d";
