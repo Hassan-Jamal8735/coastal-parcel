@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { COUNTRIES } from "@/lib/constants";
+import { useDraft } from "@/lib/use-draft";
 
 type Quote = { displayAmount: number; currencySymbol: string; distanceKm: number; route: string; error?: string };
 type Loc = { country: string; city: string; postal: string };
@@ -51,9 +52,9 @@ function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc
 }
 
 export function QuoteForm({ prefill }: { prefill: Record<string, string | undefined> }) {
-  const [origin, setOrigin] = useState<Loc>({ country: prefill.origin_country ?? "", city: prefill.origin_city ?? "", postal: prefill.origin_postal ?? "" });
-  const [dest, setDest] = useState<Loc>({ country: prefill.dest_country ?? "", city: prefill.dest_city ?? "", postal: prefill.dest_postal ?? "" });
-  const [pkg, setPkg] = useState({
+  const [origin, setOrigin] = useDraft<Loc>("cp-quote-origin", { country: prefill.origin_country ?? "", city: prefill.origin_city ?? "", postal: prefill.origin_postal ?? "" });
+  const [dest, setDest] = useDraft<Loc>("cp-quote-dest", { country: prefill.dest_country ?? "", city: prefill.dest_city ?? "", postal: prefill.dest_postal ?? "" });
+  const [pkg, setPkg] = useDraft("cp-quote-pkg", {
     weight: prefill.weight ?? "5",
     quantity: Math.max(1, parseInt(prefill.quantity ?? "1") || 1),
     length: prefill.length ?? "",
@@ -61,7 +62,7 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
     height: prefill.height ?? "",
   });
   const [preset, setPreset] = useState<string>();
-  const [showItem, setShowItem] = useState(Boolean(prefill.origin_city));
+  const [showItem, setShowItem] = useDraft("cp-quote-open", Boolean(prefill.origin_city));
   const [locError, setLocError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

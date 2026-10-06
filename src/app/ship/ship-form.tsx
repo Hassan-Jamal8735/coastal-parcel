@@ -6,6 +6,7 @@ import { ShipCardSection } from "@/components/ship-ui";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { LocationPinPicker } from "@/components/location-pin-picker";
+import { useDraft } from "@/lib/use-draft";
 import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES } from "@/lib/constants";
 import { PhoneInput } from "@/components/phone-input";
 
@@ -44,7 +45,8 @@ export type ShipFormInitial = {
 const blankPackage: PackageRow = { description: "", weight: "", pieces: "1", length: "", width: "", height: "" };
 
 export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGuest: boolean }) {
-  const [f, setF] = useState(initial);
+  // Kept across a page refresh (cleared once submitted).
+  const [f, setF, clearDraft] = useDraft(`cp-ship-draft:${initial.id ?? "new"}`, initial);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [estimate, setEstimate] = useState<{ value: string; meta: string } | null>(null);
@@ -99,6 +101,7 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
     e.preventDefault();
     setError("");
     startTransition(async () => {
+      clearDraft();
       const result = await saveShipment({ ...f, distanceKm: f.distanceKm || undefined });
       // saveShipment redirects on success; it only returns when something's wrong.
       if (result?.error) {
