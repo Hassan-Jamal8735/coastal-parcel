@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { shipmentPackages, shipments } from "@/db/schema";
 import { SHIPMENT_PURPOSES } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/dal";
-import { calculateFinalPrice, getPricingSettings, LocationError, locationDistanceKm } from "@/lib/pricing";
+import { calculateFinalPrice, getPricingSettings, haversineKm, LocationError, locationDistanceKm } from "@/lib/pricing";
 import { aggregatePackages, canAccessShipment, getShipment, newGuestToken, setGuestCookie } from "@/lib/shipments";
 import { normalizePhone } from "@/lib/phone";
 
@@ -21,6 +21,11 @@ const packageSchema = z.object({
   width: optionalNumber,
   height: optionalNumber,
 });
+
+const pinSchema = z
+  .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+  .nullable()
+  .default(null);
 
 const shipmentSchema = z.object({
   id: z.number().int().positive().optional(),
@@ -40,6 +45,8 @@ const shipmentSchema = z.object({
   deliveryCity: z.string().trim().min(1, "Please enter the delivery city."),
   deliveryPostalCode: z.string().trim().max(20).default(""),
   deliveryCountry: z.string().trim().min(1, "Please choose the delivery country."),
+  pickupPin: pinSchema,
+  deliveryPin: pinSchema,
   packages: z.array(packageSchema).min(1, "Please add at least one package."),
   shipmentPurpose: z.string().refine((v) => v in SHIPMENT_PURPOSES, "Please choose the purpose of your shipment."),
   shipmentReference: z.string().trim().max(191).default(""),
@@ -70,6 +77,9 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
   if (data.pricingMethod === "mileage") {
     if (!data.distanceKm || data.distanceKm <= 0) return { error: "Please enter a valid distance for manual-distance pricing." };
     distanceKm = data.distanceKm;
+  } else if (data.pickupPin && data.deliveryPin) {
+    // Both exact spots pinned: measure between them rather than city centres.
+    distanceKm = haversineKm(data.pickupPin, data.deliveryPin);
   } else {
     try {
       distanceKm = await locationDistanceKm(
@@ -114,6 +124,10 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
     deliveryCity: data.deliveryCity,
     deliveryPostalCode: data.deliveryPostalCode || null,
     deliveryCountry: data.deliveryCountry,
+    pickupLat: data.pickupPin?.lat ?? null,
+    pickupLng: data.pickupPin?.lng ?? null,
+    deliveryLat: data.deliveryPin?.lat ?? null,
+    deliveryLng: data.deliveryPin?.lng ?? null,
     ...totals,
     shipmentPurpose: data.shipmentPurpose,
     shipmentReference: data.shipmentReference || null,

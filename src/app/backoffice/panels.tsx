@@ -196,6 +196,13 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
                   {s.pickupCity}
                   {s.pickupPostalCode ? ` ${s.pickupPostalCode}` : ""}, {s.pickupCountry}
                 </p>
+                {s.pickupLat != null && s.pickupLng != null && (
+                  <p>
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${s.pickupLat},${s.pickupLng}`} target="_blank" rel="noopener noreferrer">
+                      Exact spot on map
+                    </a>
+                  </p>
+                )}
               </div>
               <div>
                 <p className="shipment-pd-label">Deliver to</p>
@@ -207,6 +214,13 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
                   {s.deliveryCity}
                   {s.deliveryPostalCode ? ` ${s.deliveryPostalCode}` : ""}, {s.deliveryCountry}
                 </p>
+                {s.deliveryLat != null && s.deliveryLng != null && (
+                  <p>
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${s.deliveryLat},${s.deliveryLng}`} target="_blank" rel="noopener noreferrer">
+                      Exact spot on map
+                    </a>
+                  </p>
+                )}
               </div>
             </div>
           </section>

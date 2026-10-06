@@ -5,10 +5,13 @@ import { saveShipment } from "@/app/actions/ship-form";
 import { ShipCardSection } from "@/components/ship-ui";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
+import { LocationPinPicker } from "@/components/location-pin-picker";
 import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES } from "@/lib/constants";
 import { PhoneInput } from "@/components/phone-input";
 
 type PackageRow = { description: string; weight: string; pieces: string; length: string; width: string; height: string };
+
+export type Pin = { lat: number; lng: number };
 
 export type ShipFormInitial = {
   id?: number;
@@ -28,6 +31,8 @@ export type ShipFormInitial = {
   deliveryCity: string;
   deliveryPostalCode: string;
   deliveryCountry: string;
+  pickupPin: Pin | null;
+  deliveryPin: Pin | null;
   packages: PackageRow[];
   shipmentPurpose: string;
   shipmentReference: string;
@@ -147,6 +152,14 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             </select>
           </div>
         </div>
+        <LocationPinPicker
+          label={label}
+          city={f[k("City")]}
+          country={f[k("Country")]}
+          value={f[`${where}Pin`]}
+          onChange={(pin) => setF((prev) => ({ ...prev, [`${where}Pin`]: pin }))}
+          allowGps={where === "pickup"}
+        />
       </>
     );
   };

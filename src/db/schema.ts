@@ -83,6 +83,11 @@ export const shipments = pgTable(
     deliveryCity: varchar("delivery_city", { length: 100 }).notNull(),
     deliveryPostalCode: varchar("delivery_postal_code", { length: 20 }),
     deliveryCountry: varchar("delivery_country", { length: 100 }).notNull(),
+    // Exact spots the customer pinned on the map (optional).
+    pickupLat: numeric("pickup_lat", { precision: 10, scale: 7, mode: "number" }),
+    pickupLng: numeric("pickup_lng", { precision: 10, scale: 7, mode: "number" }),
+    deliveryLat: numeric("delivery_lat", { precision: 10, scale: 7, mode: "number" }),
+    deliveryLng: numeric("delivery_lng", { precision: 10, scale: 7, mode: "number" }),
 
     // Aggregates across shipment_packages, kept in sync on save (pricing uses total weight).
     packageWeight: numeric("package_weight", { precision: 10, scale: 2, mode: "number" }).notNull(),

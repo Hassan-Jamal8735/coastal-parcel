@@ -32,7 +32,9 @@ const DRIVER_STEPS = ["Picked up", "In transit", "Out for delivery", "Delivered"
 const DRIVER_STEP_DONE: Record<string, number> = { paid: 0, assigned: 0, picked_up: 1, in_transit: 2, out_for_delivery: 3, delivered: 4 };
 
 /** One stop on the route (A = pickup, B = delivery) with one-tap call, WhatsApp and directions. */
-function Stop({ pin, label, current, name, phone, address, message }: { pin: string; label: string; current: boolean; name: string; phone: string; address: string; message: string }) {
+function Stop({ pin, label, current, name, phone, address, message, spot }: { pin: string; label: string; current: boolean; name: string; phone: string; address: string; message: string; spot: { lat: number | null; lng: number | null } }) {
+  // An exact pin from the customer beats the typed address.
+  const exact = spot.lat != null && spot.lng != null ? `${spot.lat},${spot.lng}` : null;
   const wa = whatsappLink(phone, message);
   const digits = phone.replace(/[^\d+]/g, "");
   return (
@@ -45,6 +47,7 @@ function Stop({ pin, label, current, name, phone, address, message }: { pin: str
         </p>
         <p className="dv-stop-name">{name}</p>
         <p className="dv-stop-addr">{address}</p>
+        {exact && <p className="dv-pinned">&#9679; Exact spot pinned by customer</p>}
         <div className="dv-actions">
           {digits && (
             <a href={`tel:${digits}`} className="dv-chip">
@@ -56,7 +59,7 @@ function Stop({ pin, label, current, name, phone, address, message }: { pin: str
               WhatsApp
             </a>
           )}
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer" className="dv-chip">
+          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(exact ?? address)}`} target="_blank" rel="noopener noreferrer" className="dv-chip">
             Directions
           </a>
         </div>
@@ -187,6 +190,7 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
                           name={s.senderName}
                           phone={s.senderPhone}
                           address={`${s.pickupAddress}, ${s.pickupCity}, ${s.pickupCountry}`}
+                          spot={{ lat: s.pickupLat, lng: s.pickupLng }}
                           message={`Hi ${s.senderName}, this is your Coastal Parcel driver regarding shipment ${ref}.`}
                         />
                         <Stop
@@ -196,6 +200,7 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
                           name={s.receiverName}
                           phone={s.receiverPhone}
                           address={`${s.deliveryAddress}, ${s.deliveryCity}, ${s.deliveryCountry}`}
+                          spot={{ lat: s.deliveryLat, lng: s.deliveryLng }}
                           message={`Hi ${s.receiverName}, this is your Coastal Parcel driver regarding shipment ${ref}.`}
                         />
                       </div>

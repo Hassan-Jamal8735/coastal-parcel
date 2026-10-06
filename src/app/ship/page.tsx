@@ -38,6 +38,8 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       deliveryCity: s.deliveryCity,
       deliveryPostalCode: s.deliveryPostalCode ?? "",
       deliveryCountry: s.deliveryCountry,
+      pickupPin: s.pickupLat != null && s.pickupLng != null ? { lat: s.pickupLat, lng: s.pickupLng } : null,
+      deliveryPin: s.deliveryLat != null && s.deliveryLng != null ? { lat: s.deliveryLat, lng: s.deliveryLng } : null,
       packages: pkgs.map((p) => ({
         description: p.description ?? "",
         weight: String(p.weight),
@@ -71,6 +73,8 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       deliveryCity: q.delivery_city ?? "",
       deliveryPostalCode: q.delivery_postal_code ?? "",
       deliveryCountry: q.delivery_country ?? "",
+      pickupPin: null,
+      deliveryPin: null,
       packages: [
         {
           description: "",
