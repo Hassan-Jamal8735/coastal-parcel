@@ -299,16 +299,24 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
             </section>
           )}
 
-          {(points.length > 0 || live) && (
+          {(points.length > 0 || live || s.pickupLat != null || s.deliveryLat != null) && (
             <section className="bo-card">
-              <h3 className="sd-card-title">{live ? "Live location" : "Location checkpoints"}</h3>
+              <h3 className="sd-card-title">{live ? "Live location" : "Map"}</h3>
               {live && (
                 <p className="cp-live-location-note">
                   <span className="cp-live-dot" />
                   Driver&apos;s current location &mdash; updated {timeAgo(live.updatedAt)} ago
                 </p>
               )}
-              <TrackingMap points={points} live={live} radius={8} />
+              <TrackingMap
+                points={points}
+                live={live}
+                radius={8}
+                stops={{
+                  pickup: s.pickupLat != null && s.pickupLng != null ? { lat: s.pickupLat, lng: s.pickupLng, label: `Pickup — ${s.senderName}` } : null,
+                  delivery: s.deliveryLat != null && s.deliveryLng != null ? { lat: s.deliveryLat, lng: s.deliveryLng, label: `Delivery — ${s.receiverName}` } : null,
+                }}
+              />
             </section>
           )}
 

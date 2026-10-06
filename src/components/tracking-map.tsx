@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 
 export type MapPoint = { lat: number; lng: number; label: string };
+/** The customer's pinned pickup (A) and delivery (B) spots. */
+export type MapStops = { pickup?: MapPoint | null; delivery?: MapPoint | null };
 type Live = { lat: number; lng: number; accuracy?: number | null } | null | undefined;
 
 /**
@@ -13,12 +15,12 @@ type Live = { lat: number; lng: number; accuracy?: number | null } | null | unde
  * viewer's zoom and pan are kept. Leaflet touches `window`, so it's loaded
  * only in the browser.
  */
-export function TrackingMap({ points, live, height = 300, radius = 12 }: { points: MapPoint[]; live?: Live; height?: number; radius?: number }) {
+export function TrackingMap({ points, live, stops, height = 300, radius = 12 }: { points: MapPoint[]; live?: Live; stops?: MapStops; height?: number; radius?: number }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<import("leaflet").Map | null>(null);
   const L = useRef<typeof import("leaflet") | null>(null);
   const dot = useRef<{ marker: import("leaflet").Marker; circle: import("leaflet").Circle } | null>(null);
-  const pointsKey = JSON.stringify(points);
+  const pointsKey = JSON.stringify([points, stops]);
 
   function showLive(next: Live) {
     const m = map.current, lib = L.current;
@@ -73,6 +75,13 @@ export function TrackingMap({ points, live, height = 300, radius = 12 }: { point
         return [p.lat, p.lng];
       });
       if (latlngs.length > 1) lib.polyline(latlngs, { color: "#f9b416" }).addTo(m);
+      // Lettered A/B stops, framed with everything else.
+      for (const [letter, stop] of [["A", stops?.pickup], ["B", stops?.delivery]] as const) {
+        if (!stop) continue;
+        const icon = lib.divIcon({ className: "cp-stop-marker", html: `<span class="cp-stop-pin">${letter}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
+        lib.marker([stop.lat, stop.lng], { icon }).addTo(m).bindPopup(stop.label);
+        latlngs.push([stop.lat, stop.lng]);
+      }
       if (live) latlngs.push([live.lat, live.lng]);
       if (latlngs.length > 1) m.fitBounds(latlngs, { padding: [30, 30], maxZoom: 16 });
       else if (latlngs.length === 1) m.setView(latlngs[0], 15);

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { accuracyLabel, distanceM, refreshGps, startGps, useGps } from "@/lib/gps";
 
-/** Fixes worse than this are not sent as the live position (Wi-Fi/cell guesses). */
-const MAX_LIVE_ACCURACY_M = 100;
+/** Fixes worse than this are not sent as the live position; anything better is sent with its accuracy circle. */
+const MAX_LIVE_ACCURACY_M = 1000;
 /** Send when the driver has moved this far… */
 const MOVE_M = 20;
 /** …or at least this often while standing still. */

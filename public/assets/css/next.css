@@ -1062,3 +1062,18 @@
 .cp-live-badge:hover {
   background: #d6e7fb;
 }
+
+/* Pinned pickup (A) / delivery (B) stops on tracking maps */
+.cp-stop-pin {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1c1c1c;
+  border: 3px solid #f9b416;
+  box-sizing: border-box;
+  color: #fff;
+  font: 700 12px/1 'Quicksand', sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}

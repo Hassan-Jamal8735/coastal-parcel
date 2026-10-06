@@ -1,7 +1,7 @@
 import { serviceLabel, statusLabel } from "@/lib/constants";
 import type { Shipment } from "@/lib/shipments";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
-import { TrackingMap, type MapPoint } from "./tracking-map";
+import { TrackingMap, type MapPoint, type MapStops } from "./tracking-map";
 
 /** The journey shown as a progress bar, and which step each status reaches. */
 const STEPS = ["Booked", "Picked up", "In transit", "Out for delivery", "Delivered"];
@@ -39,6 +39,11 @@ export async function TrackingResult({ shipment: s }: { shipment: Shipment }) {
   const points: MapPoint[] = events
     .filter((e) => e.lat != null && e.lng != null)
     .map((e) => ({ lat: Number(e.lat), lng: Number(e.lng), label: `${statusLabel(e.status)} — ${formatDateTime(e.createdAt, false)}` }));
+
+  const stops: MapStops = {
+    pickup: s.pickupLat != null && s.pickupLng != null ? { lat: s.pickupLat, lng: s.pickupLng, label: `Pickup — ${s.pickupCity}` } : null,
+    delivery: s.deliveryLat != null && s.deliveryLng != null ? { lat: s.deliveryLat, lng: s.deliveryLng, label: `Delivery — ${s.deliveryCity}` } : null,
+  };
 
   // One entry per step, at the moment it was first reached — staff
   // corrections that bounce a status back and forth don't repeat steps.
@@ -99,7 +104,7 @@ export async function TrackingResult({ shipment: s }: { shipment: Shipment }) {
           Driver&apos;s current location &mdash; updated {timeAgo(live.updatedAt)} ago
         </p>
       )}
-      {(points.length > 0 || live) && <TrackingMap points={points} live={live} />}
+      {(points.length > 0 || live || stops.pickup || stops.delivery) && <TrackingMap points={points} live={live} stops={stops} />}
 
       {timeline.length > 0 && (
         <>

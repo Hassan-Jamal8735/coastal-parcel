@@ -25,8 +25,9 @@ export function DriverStatusForm({
 
   useEffect(() => startGps(), []);
 
-  // Only a GPS-grade fix is attached as the checkpoint; a weak one is left off rather than placing the pin wrongly.
-  const usable = fix && fix.accuracy <= 100 ? fix : null;
+  // Attach any fix within 1 km (computers and indoor phones often only manage a few hundred metres);
+  // its accuracy is saved with it and shown on the map, so a rough fix never looks exact.
+  const usable = fix && fix.accuracy <= 1000 ? fix : null;
   const geoText =
     status === "denied"
       ? "Location blocked — the update still works"
