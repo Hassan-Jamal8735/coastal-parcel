@@ -1,13 +1,13 @@
 import { and, count, desc, eq, sql, sum } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
-import { boCreateStaff, boMarkMessageRead, boRemoveStaff, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
+import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
-import { formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
-import { getPricingSettings } from "@/lib/pricing";
+import { COUNTRIES, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { getCountryRates, getPricingSettings, type CountryRates } from "@/lib/pricing";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
 
 /** Panels of /backoffice — ports of the cp_bo_render_* functions in WordPress inc/backoffice.php. */
@@ -487,34 +487,104 @@ export async function DriversPanel({ saved }: { saved: boolean }) {
 
 /* ---------------- Pricing & Payment ---------------- */
 
-export async function PricingPanel({ saved }: { saved: boolean }) {
-  const rates = await getPricingSettings();
+const PRICING_ERRORS: Record<string, string> = {
+  country: "Please choose a country.",
+  rates: "Please enter all three rates as numbers of 0 or more.",
+};
+
+function RateFields({ prefix, rates }: { prefix: string; rates?: CountryRates }) {
+  return (
+    <div className="pr-fields">
+      <div className="dashboard-form-field">
+        <label htmlFor={`${prefix}-km`}>Rate per km (NGN)</label>
+        <input id={`${prefix}-km`} type="number" step="0.01" min="0" name="rate_per_km_ngn" defaultValue={rates?.ratePerKmNgn} required />
+      </div>
+      <div className="dashboard-form-field">
+        <label htmlFor={`${prefix}-kg`}>Rate per kg (NGN)</label>
+        <input id={`${prefix}-kg`} type="number" step="0.01" min="0" name="rate_per_kg_ngn" defaultValue={rates?.ratePerKgNgn} required />
+      </div>
+      <div className="dashboard-form-field">
+        <label htmlFor={`${prefix}-pickup`}>Pickup fee (NGN)</label>
+        <input id={`${prefix}-pickup`} type="number" step="0.01" min="0" name="pickup_fee_ngn" defaultValue={rates?.pickupFeeNgn} required />
+      </div>
+    </div>
+  );
+}
+
+export async function PricingPanel({ saved, error }: { saved: boolean; error?: string }) {
+  const [rates, countryRates] = await Promise.all([getPricingSettings(), getCountryRates()]);
+  const configured = Object.entries(countryRates).sort(([a], [b]) => a.localeCompare(b));
+  const available = COUNTRIES.filter((c) => !countryRates[c]);
+  const errorText = error ? PRICING_ERRORS[error] : undefined;
 
   return (
     <>
       <h2>Pricing</h2>
-      <p className="dashboard-panel-subtext">Rates used by the quote calculator and real bookings.</p>
-      {saved && <div className="dashboard-success">Settings saved.</div>}
+      <p className="dashboard-panel-subtext">
+        A shipment is priced with the rates of the country it ships from. Countries without their own rates use the default rates.
+      </p>
+      {saved && !errorText && <div className="dashboard-success">Settings saved.</div>}
+      {errorText && <div className="auth-error">{errorText}</div>}
 
       <div className="bo-card">
-        <h3>Shipping Rates</h3>
+        <h3>Default rates</h3>
+        <p className="sd-muted">Used for every country not listed below.</p>
         <form action={boSavePricing}>
-          <div className="dashboard-form-field">
-            <label htmlFor="rate-km">Rate per km (NGN)</label>
-            <input id="rate-km" type="number" step="0.01" min="0" name="rate_per_km_ngn" defaultValue={rates.ratePerKmNgn} />
-          </div>
-          <div className="dashboard-form-field">
-            <label htmlFor="rate-kg">Rate per kg (NGN)</label>
-            <input id="rate-kg" type="number" step="0.01" min="0" name="rate_per_kg_ngn" defaultValue={rates.ratePerKgNgn} />
-          </div>
-          <div className="dashboard-form-field">
-            <label htmlFor="rate-pickup">Pickup fee (NGN)</label>
-            <input id="rate-pickup" type="number" step="0.01" min="0" name="pickup_fee_ngn" defaultValue={rates.pickupFeeNgn} />
-          </div>
-          <input type="submit" className="main-button w-button" value="Save Rates" />
+          <RateFields prefix="default" rates={rates} />
+          <input type="submit" className="main-button w-button" value="Save default rates" />
         </form>
       </div>
 
+      <div className="bo-card" id="countries">
+        <h3>Country rates</h3>
+        {configured.length === 0 ? (
+          <p className="sd-muted">No country has its own rates yet, so every shipment uses the default rates.</p>
+        ) : (
+          <div className="pr-list">
+            {configured.map(([country, r]) => (
+              <details key={country} className="pr-row">
+                <summary>
+                  <span className="pr-country">{country}</span>
+                  <span className="pr-sum">
+                    &#8358;{r.ratePerKmNgn.toLocaleString("en-US")}/km &middot; &#8358;{r.ratePerKgNgn.toLocaleString("en-US")}/kg &middot; pickup &#8358;
+                    {r.pickupFeeNgn.toLocaleString("en-US")}
+                  </span>
+                  <span className="pr-edit">Edit</span>
+                </summary>
+                <form action={boSaveCountryRates} className="pr-form">
+                  <input type="hidden" name="country" value={country} />
+                  <RateFields prefix={`c-${country}`} rates={r} />
+                  <div className="pr-actions">
+                    <input type="submit" className="main-button w-button" value="Save" />
+                    <button type="submit" formAction={boRemoveCountryRates} formNoValidate className="dv-failed">
+                      Remove {country}
+                    </button>
+                  </div>
+                </form>
+              </details>
+            ))}
+          </div>
+        )}
+
+        <h4 className="pr-add-title">Add a country</h4>
+        <form action={boSaveCountryRates}>
+          <div className="dashboard-form-field">
+            <label htmlFor="new-country">Ships from</label>
+            <select id="new-country" name="country" defaultValue="" required>
+              <option value="" disabled>
+                Select country
+              </option>
+              {available.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <RateFields prefix="new" />
+          <input type="submit" className="main-button w-button" value="Add country rates" />
+        </form>
+      </div>
     </>
   );
 }

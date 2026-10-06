@@ -16,7 +16,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
   if (s.status !== "confirmed") redirect(`/booking-confirmed?shipment_id=${s.id}`);
 
   const currency = s.chargeCurrency || "NGN";
-  const rates = await getPricingSettings();
+  const rates = await getPricingSettings(s.pickupCountry);
   const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: s.serviceType, addons: s.addons });
   const sym = currencySymbol(currency);
   const show = async (ngn: number) => sym + (await convertNgnTo(ngn, currency)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

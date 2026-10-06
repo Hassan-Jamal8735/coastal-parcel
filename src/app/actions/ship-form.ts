@@ -87,7 +87,7 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
   );
   const totals = aggregatePackages(packages);
   const fulfillment = existing?.fulfillment ?? data.fulfillment;
-  const rates = await getPricingSettings();
+  const rates = await getPricingSettings(data.pickupCountry);
   const price = calculateFinalPrice(rates, {
     weightKg: totals.packageWeight,
     distanceKm,

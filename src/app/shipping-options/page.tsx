@@ -12,7 +12,7 @@ export default async function ShippingOptionsPage({ searchParams }: { searchPara
   const { shipment_id, error } = await searchParams;
   const s = await requireAccessibleShipment(Number(shipment_id));
   if (s.status !== "draft") redirect(`/booking?shipment_id=${s.id}`);
-  const rates = await getPricingSettings();
+  const rates = await getPricingSettings(s.pickupCountry);
   const isDomestic = s.pickupCountry === s.deliveryCountry;
   const now = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: SITE_TIMEZONE });
 

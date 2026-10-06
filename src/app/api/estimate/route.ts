@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     route = `${input.originCity}, ${input.originCountry} → ${input.destinationCity}, ${input.destinationCountry}`;
   }
 
-  const rates = await getPricingSettings();
+  const rates = await getPricingSettings(input.originCountry);
   let priceNgn = basePriceNgn(rates, input.weightKg, distanceKm);
   if (input.fulfillment === "pickup") priceNgn += rates.pickupFeeNgn;
   const currency = input.currency.toUpperCase();

@@ -65,7 +65,7 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
             {panel === "shipments" && <ShipmentsPanel view={view} saved={saved} />}
             {panel === "customers" && <CustomersPanel view={view} />}
             {panel === "drivers" && <DriversPanel saved={saved} />}
-            {panel === "pricing" && <PricingPanel saved={saved} />}
+            {panel === "pricing" && <PricingPanel saved={saved} error={q.error} />}
             {panel === "reports" && <ReportsPanel />}
             {panel === "messages" && <MessagesPanel />}
             {panel === "staff" && <StaffPanel saved={saved} error={q.error} currentUserId={user.id} />}

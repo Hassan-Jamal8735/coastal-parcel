@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import * as z from "zod";
 import { db } from "@/db";
 import { contactMessages, settings, shipments, trackingEvents, users } from "@/db/schema";
-import { SHIPMENT_STATUS_LABELS } from "@/lib/constants";
+import { COUNTRIES, SHIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { notifyCustomerStatusChange, notifyDriverAssigned, sendDriverDecision, sendStaffAccountCreated } from "@/lib/email";
 import { DEFAULT_PRICING } from "@/lib/pricing";
@@ -93,6 +93,41 @@ export async function boSavePricing(formData: FormData) {
     .values({ key: "pricing", value })
     .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date() } });
   redirect("/backoffice?panel=pricing&saved=1");
+}
+
+async function writePricing(change: (value: Record<string, unknown>) => Record<string, unknown>) {
+  const [row] = await db.select().from(settings).where(eq(settings.key, "pricing")).limit(1);
+  const value = change({ ...((row?.value as Record<string, unknown>) ?? {}) });
+  await db
+    .insert(settings)
+    .values({ key: "pricing", value })
+    .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date() } });
+}
+
+/** Adds or updates one country's own rates (used for shipments sent FROM that country). */
+export async function boSaveCountryRates(formData: FormData) {
+  await requireStaff();
+  const country = String(formData.get("country") ?? "");
+  if (!(COUNTRIES as readonly string[]).includes(country)) redirect("/backoffice?panel=pricing&error=country#countries");
+  const rates: Record<string, number> = {};
+  for (const [field, key] of [["rate_per_km_ngn", "ratePerKmNgn"], ["rate_per_kg_ngn", "ratePerKgNgn"], ["pickup_fee_ngn", "pickupFeeNgn"]]) {
+    const n = Number(formData.get(field));
+    if (formData.get(field) === "" || !Number.isFinite(n) || n < 0) redirect("/backoffice?panel=pricing&error=rates#countries");
+    rates[key] = n;
+  }
+  await writePricing((v) => ({ ...v, countries: { ...((v.countries as object) ?? {}), [country]: rates } }));
+  redirect("/backoffice?panel=pricing&saved=1#countries");
+}
+
+export async function boRemoveCountryRates(formData: FormData) {
+  await requireStaff();
+  const country = String(formData.get("country") ?? "");
+  await writePricing((v) => {
+    const countries = { ...((v.countries as Record<string, unknown>) ?? {}) };
+    delete countries[country];
+    return { ...v, countries };
+  });
+  redirect("/backoffice?panel=pricing&saved=1#countries");
 }
 
 export async function boMarkMessageRead(formData: FormData) {

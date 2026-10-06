@@ -18,7 +18,7 @@ async function editableDraft(id: number): Promise<Shipment> {
 }
 
 async function reprice(s: Shipment, serviceType: string, addons: string[]) {
-  const rates = await getPricingSettings();
+  const rates = await getPricingSettings(s.pickupCountry);
   return calculateFinalPrice(rates, {
     weightKg: s.packageWeight,
     distanceKm: s.distanceKm ?? 0,

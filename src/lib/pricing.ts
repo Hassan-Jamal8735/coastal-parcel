@@ -34,13 +34,32 @@ export const DEFAULT_PRICING = {
 };
 export type PricingSettings = typeof DEFAULT_PRICING;
 
-/** Admin-saved rates (backoffice) merged over the defaults. */
-export async function getPricingSettings(): Promise<PricingSettings> {
+/** The three rates that can differ per country (all in NGN). */
+export type CountryRates = { ratePerKmNgn: number; ratePerKgNgn: number; pickupFeeNgn: number };
+type SavedPricing = Partial<PricingSettings> & { countries?: Record<string, CountryRates> };
+
+async function savedPricing(): Promise<SavedPricing> {
   const [row] = await db.select().from(settings).where(eq(settings.key, "pricing")).limit(1);
-  const saved = (row?.value ?? {}) as Partial<PricingSettings>;
+  return (row?.value ?? {}) as SavedPricing;
+}
+
+/** Per-country rates set in the backoffice, keyed by country name. */
+export async function getCountryRates(): Promise<Record<string, CountryRates>> {
+  return (await savedPricing()).countries ?? {};
+}
+
+/**
+ * Rates for a shipment, chosen by the country it ships FROM: that country's
+ * own rates when the backoffice has set them, otherwise the default rates
+ * ("All other countries"). Called without a country = the defaults.
+ */
+export async function getPricingSettings(originCountry?: string): Promise<PricingSettings> {
+  const { countries, ...saved } = await savedPricing();
+  const own = originCountry ? countries?.[originCountry] : undefined;
   return {
     ...DEFAULT_PRICING,
     ...saved,
+    ...own,
     serviceMultipliers: { ...DEFAULT_PRICING.serviceMultipliers, ...saved.serviceMultipliers },
     addons: { ...DEFAULT_PRICING.addons, ...saved.addons },
   };
