@@ -34,8 +34,9 @@ export async function getTrackingEvents(shipmentId: number) {
  * progress, and only if their last ping was within 10 minutes (an older
  * fix would be more misleading than useful).
  */
-export async function getLiveDriverLocation(s: { driverId: number | null; status: string }) {
-  if (!s.driverId || !ACTIVE_DELIVERY_STATUSES.includes(s.status)) return null;
+export async function getLiveDriverLocation(s: { driverId: number | null; status: string }, opts: { anyStatus?: boolean } = {}) {
+  // Customers only see the driver mid-delivery; the office (anyStatus) sees them whenever they're sharing.
+  if (!s.driverId || (!opts.anyStatus && !ACTIVE_DELIVERY_STATUSES.includes(s.status))) return null;
   const [d] = await db
     .select({ lat: users.lastLat, lng: users.lastLng, at: users.lastLocationAt, accuracy: users.lastAccuracyM })
     .from(users)

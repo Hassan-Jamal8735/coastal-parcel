@@ -37,7 +37,7 @@ export function FleetMap({ drivers }: { drivers: FleetDriver[] }) {
       const at: [number, number] = [d.lat, d.lng];
       const jobs = d.jobs
         .map((j) => `<a href="/backoffice?panel=shipments&view=${j.id}">${escape(j.ref)}</a> · ${escape(j.route)} · ${escape(j.status)}`)
-        .join("<br>");
+        .join("<br>") || "<span style=\"color:#1e7e42\">Available</span>";
       const popup = `<strong>${escape(d.name)}</strong>${d.accuracy ? ` <span style="color:#777">±${d.accuracy} m</span>` : ""}<br>${jobs}`;
       const existing = dots.current.get(d.id);
       if (existing) {

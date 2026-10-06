@@ -139,7 +139,7 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
 
   const [events, live, approvedDrivers] = await Promise.all([
     getTrackingEvents(s.id),
-    getLiveDriverLocation(s),
+    getLiveDriverLocation(s, { anyStatus: true }),
     db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.role, "driver"), eq(users.driverStatus, "approved"))).orderBy(users.name),
   ]);
   const points: MapPoint[] = events
@@ -616,66 +616,83 @@ export async function PricingPanel({ saved, error }: { saved: boolean; error?: s
 
 const LIVE_STALE_MS = 10 * 60 * 1000;
 
-/** Active deliveries with their driver's position, split into drivers live now and shipments with no recent signal. */
+/** Every approved driver with their last position and the shipments they're carrying now. */
 async function loadFleet() {
-  const rows = await db
-    .select({ s: shipments, driverName: drivers.name, lat: drivers.lastLat, lng: drivers.lastLng, at: drivers.lastLocationAt, accuracy: drivers.lastAccuracyM })
-    .from(shipments)
-    .innerJoin(drivers, eq(drivers.id, shipments.driverId))
-    .where(inArray(shipments.status, ACTIVE_DELIVERY_STATUSES))
-    .orderBy(desc(shipments.updatedAt));
+  const [driverRows, jobs] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, phone: users.phone, lat: users.lastLat, lng: users.lastLng, at: users.lastLocationAt, accuracy: users.lastAccuracyM })
+      .from(users)
+      .where(and(eq(users.role, "driver"), eq(users.driverStatus, "approved")))
+      .orderBy(users.name),
+    db.select().from(shipments).where(inArray(shipments.status, ACTIVE_DELIVERY_STATUSES)),
+  ]);
+  const jobsOf = (id: number) =>
+    jobs
+      .filter((j) => j.driverId === id)
+      .map((j) => ({ id: j.id, ref: j.trackingNumber ?? `#${j.id}`, route: `${j.pickupCity} → ${j.deliveryCity}`, status: statusLabel(j.status) }));
 
-  // One dot per driver (a driver can carry several shipments at once).
-  const byDriver = new Map<number, FleetDriver>();
-  const freshIds = new Set<number>();
-  for (const r of rows) {
-    const fresh = r.lat != null && r.lng != null && r.at && Date.now() - r.at.getTime() <= LIVE_STALE_MS;
-    if (!fresh) continue;
-    freshIds.add(r.s.id);
-    const d = byDriver.get(r.s.driverId!) ?? { id: r.s.driverId!, name: r.driverName, lat: Number(r.lat), lng: Number(r.lng), accuracy: r.accuracy, jobs: [] };
-    d.jobs.push({ id: r.s.id, ref: r.s.trackingNumber ?? `#${r.s.id}`, route: `${r.s.pickupCity} → ${r.s.deliveryCity}`, status: statusLabel(r.s.status) });
-    byDriver.set(d.id, d);
-  }
-  return { rows, live: [...byDriver.values()], freshIds };
+  const drivers = driverRows.map((d) => {
+    const fresh = d.lat != null && d.lng != null && d.at != null && Date.now() - d.at.getTime() <= LIVE_STALE_MS;
+    return { ...d, fresh, jobs: jobsOf(d.id) };
+  });
+  const live: FleetDriver[] = drivers
+    .filter((d) => d.fresh)
+    .map((d) => ({ id: d.id, name: d.name, lat: Number(d.lat), lng: Number(d.lng), accuracy: d.accuracy, jobs: d.jobs }));
+  const unassigned = jobs.filter((j) => !j.driverId).length;
+  return { drivers, live, activeCount: jobs.length, unassigned };
 }
 
 export async function LiveMapPanel() {
-  const { rows, live, freshIds } = await loadFleet();
+  const { drivers, live, activeCount, unassigned } = await loadFleet();
 
   return (
     <>
       <h2>Live Map</h2>
-      <p className="dashboard-panel-subtext">Drivers on active deliveries, updated every few seconds while their dashboard is open.</p>
+      <p className="dashboard-panel-subtext">
+        Every approved driver who has their dashboard open, updated every few seconds. Customers only see a driver while their own parcel is on the way.
+      </p>
       <div className="dashboard-stat-row">
-        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{live.length}</div><div className="dashboard-stat-label">Drivers live now</div></div>
-        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{rows.length}</div><div className="dashboard-stat-label">Active deliveries</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{live.length}</div><div className="dashboard-stat-label">Drivers online</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{live.filter((d) => d.jobs.length).length}</div><div className="dashboard-stat-label">On a delivery</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{activeCount}</div><div className="dashboard-stat-label">Active deliveries</div></div>
       </div>
+      {unassigned > 0 && (
+        <div className="auth-notice">
+          {unassigned} paid shipment(s) have no driver yet. <Link href="/backoffice?panel=shipments">Assign them in Shipments.</Link>
+        </div>
+      )}
       <FleetMap drivers={live} />
-      {live.length === 0 && <p className="sd-muted">No driver is sharing a live location right now.</p>}
+      {live.length === 0 && <p className="sd-muted">No driver has their dashboard open right now, so no live locations to show.</p>}
 
-      {rows.length > 0 && (
+      {drivers.length > 0 && (
         <table className="bo-table" style={{ marginTop: 20 }}>
-          <thead><tr><th>Shipment</th><th>Route</th><th>Status</th><th>Driver</th><th>Location</th><th></th></tr></thead>
+          <thead><tr><th>Driver</th><th>Status</th><th>Location</th><th>Carrying</th></tr></thead>
           <tbody>
-            {rows.map((r) => {
-              const fresh = freshIds.has(r.s.id);
-              return (
-                <tr key={r.s.id}>
-                  <td>{r.s.trackingNumber ? <code>{r.s.trackingNumber}</code> : `#${r.s.id}`}</td>
-                  <td>{r.s.pickupCity} &rarr; {r.s.deliveryCity}</td>
-                  <td><StatusBadge status={r.s.status} /></td>
-                  <td>{r.driverName}</td>
-                  <td>
-                    {fresh ? (
-                      <span className="live-ok">&#9679; Live {timeAgo(r.at!)} ago{r.accuracy ? ` · ±${r.accuracy} m` : ""}</span>
-                    ) : (
-                      <span className="sd-muted">{r.at ? `Last seen ${timeAgo(r.at)} ago` : "No signal yet"}</span>
-                    )}
-                  </td>
-                  <td><Link href={`/backoffice?panel=shipments&view=${r.s.id}`}>View</Link></td>
-                </tr>
-              );
-            })}
+            {drivers.map((d) => (
+              <tr key={d.id}>
+                <td>
+                  {d.name}
+                  {d.phone && <div className="sd-muted">{d.phone}</div>}
+                </td>
+                <td>{d.jobs.length ? <span className="shipment-status-badge status-in_transit">On delivery</span> : <span className="shipment-status-badge status-delivered">Available</span>}</td>
+                <td>
+                  {d.fresh ? (
+                    <span className="live-ok">&#9679; Live {timeAgo(d.at!)} ago{d.accuracy ? ` · ±${d.accuracy} m` : ""}</span>
+                  ) : (
+                    <span className="sd-muted">{d.at ? `Offline · last seen ${timeAgo(d.at)} ago` : "Offline · never shared"}</span>
+                  )}
+                </td>
+                <td>
+                  {d.jobs.length
+                    ? d.jobs.map((j) => (
+                        <div key={j.id}>
+                          <Link href={`/backoffice?panel=shipments&view=${j.id}`}>{j.ref}</Link> <span className="sd-muted">{j.route}</span>
+                        </div>
+                      ))
+                    : <span className="sd-muted">—</span>}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

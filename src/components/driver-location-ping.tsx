@@ -27,7 +27,8 @@ export function DriverLocationPing({ tracking }: { tracking: boolean }) {
   // Live position: only GPS-grade fixes, sent when the driver moves MOVE_M,
   // and re-sent every EVERY_MS while standing still (no new fix arrives then).
   useEffect(() => {
-    if (!tracking) return;
+    // Sent whenever the dashboard is open: the office sees every driver; customers only see
+    // the driver while their own parcel is on its way (filtered on the server).
     const send = (force: boolean) => {
       const f = fix;
       if (!f || f.accuracy > MAX_LIVE_ACCURACY_M) return;
@@ -91,7 +92,7 @@ export function DriverLocationPing({ tracking }: { tracking: boolean }) {
         ? "Signal is weak. Move outside or near a window, or tap Refresh."
         : tracking
           ? "Your live location is being shared with this shipment."
-          : "Ready. Your location is shared once you have an active shipment.";
+          : "Your location is visible to the Coastal Parcel office while this page is open.";
   } else if (status === "denied") {
     title = "Location is blocked";
     detail = "Allow location for this site in your browser settings (tap the lock icon next to the address), then tap Enable GPS.";
