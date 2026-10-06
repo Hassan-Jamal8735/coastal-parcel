@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/dal";
 import {
   CustomersPanel,
   DriversPanel,
+  LiveMapPanel,
   MessagesPanel,
   OverviewPanel,
   PricingPanel,
@@ -19,6 +20,7 @@ export const metadata = { title: "Back Office" };
 const PANELS = [
   ["overview", "Overview"],
   ["shipments", "Shipments"],
+  ["live", "Live Map"],
   ["customers", "Customers"],
   ["drivers", "Drivers"],
   ["pricing", "Pricing"],
@@ -63,6 +65,7 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
           <div className="dashboard-panel active bo-panel">
             {panel === "overview" && <OverviewPanel />}
             {panel === "shipments" && <ShipmentsPanel view={view} saved={saved} />}
+            {panel === "live" && <LiveMapPanel />}
             {panel === "customers" && <CustomersPanel view={view} />}
             {panel === "drivers" && <DriversPanel saved={saved} />}
             {panel === "pricing" && <PricingPanel saved={saved} error={q.error} />}
@@ -73,6 +76,7 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
         </main>
       </div>
       {(panel === "overview" || (panel === "shipments" && view > 0)) && <LiveRefresh interval={15000} />}
+      {panel === "live" && <LiveRefresh interval={8000} />}
     </div>
   );
 }

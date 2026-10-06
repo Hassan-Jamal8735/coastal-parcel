@@ -7,7 +7,8 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { PanelSwitcher } from "@/components/panel-switcher";
 import { db } from "@/db";
 import { shipments } from "@/db/schema";
-import { serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { ACTIVE_DELIVERY_STATUSES, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { driversLiveNow } from "@/lib/tracking";
 import { requireRole } from "@/lib/dal";
 import { flashFor } from "@/lib/flash";
 import { PhoneInput } from "@/components/phone-input";
@@ -26,6 +27,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const { msg } = await searchParams;
   const flash = flashFor(msg);
   const list = await db.select().from(shipments).where(eq(shipments.customerId, user.id)).orderBy(desc(shipments.createdAt));
+  // Shipments whose driver is sharing a live location right now get a "Live" link to the map.
+  const live = await driversLiveNow(list.filter((s) => s.driverId && ACTIVE_DELIVERY_STATUSES.includes(s.status)).map((s) => s.driverId!));
 
   const completed = list.filter((s) => s.status === "delivered").length;
   const active = list.filter((s) => s.status !== "delivered" && !INACTIVE.includes(s.status)).length;
@@ -75,7 +78,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {list.map((s) => (
                   <div key={s.id} className="shipment-card">
                     <div className="shipment-card-header">
-                      <span className={`shipment-status-badge status-${s.status}`}>{statusLabel(s.status)}</span>
+                      <span className="cp-badge-row">
+                        <span className={`shipment-status-badge status-${s.status}`}>{statusLabel(s.status)}</span>
+                        {s.driverId && live.has(s.driverId) && ACTIVE_DELIVERY_STATUSES.includes(s.status) && s.trackingNumber && (
+                          <Link href={`/track-shipment?tracking=${s.trackingNumber}`} className="cp-live-badge">
+                            <span className="cp-live-dot" /> Live &mdash; see where it is
+                          </Link>
+                        )}
+                      </span>
                       <span className="shipment-date">
                         {s.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SITE_TIMEZONE })}
                       </span>

@@ -1,12 +1,13 @@
-import { and, count, desc, eq, sql, sum } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
 import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { FleetMap, type FleetDriver } from "@/components/fleet-map";
 import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
-import { COUNTRIES, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { ACTIVE_DELIVERY_STATUSES, COUNTRIES, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { getCountryRates, getPricingSettings, type CountryRates } from "@/lib/pricing";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
 
@@ -599,6 +600,77 @@ export async function PricingPanel({ saved, error }: { saved: boolean; error?: s
           <input type="submit" className="main-button w-button" value="Add country rates" />
         </form>
       </div>
+    </>
+  );
+}
+
+/* ---------------- Live map ---------------- */
+
+const LIVE_STALE_MS = 10 * 60 * 1000;
+
+/** Active deliveries with their driver's position, split into drivers live now and shipments with no recent signal. */
+async function loadFleet() {
+  const rows = await db
+    .select({ s: shipments, driverName: drivers.name, lat: drivers.lastLat, lng: drivers.lastLng, at: drivers.lastLocationAt, accuracy: drivers.lastAccuracyM })
+    .from(shipments)
+    .innerJoin(drivers, eq(drivers.id, shipments.driverId))
+    .where(inArray(shipments.status, ACTIVE_DELIVERY_STATUSES))
+    .orderBy(desc(shipments.updatedAt));
+
+  // One dot per driver (a driver can carry several shipments at once).
+  const byDriver = new Map<number, FleetDriver>();
+  const freshIds = new Set<number>();
+  for (const r of rows) {
+    const fresh = r.lat != null && r.lng != null && r.at && Date.now() - r.at.getTime() <= LIVE_STALE_MS;
+    if (!fresh) continue;
+    freshIds.add(r.s.id);
+    const d = byDriver.get(r.s.driverId!) ?? { id: r.s.driverId!, name: r.driverName, lat: Number(r.lat), lng: Number(r.lng), accuracy: r.accuracy, jobs: [] };
+    d.jobs.push({ id: r.s.id, ref: r.s.trackingNumber ?? `#${r.s.id}`, route: `${r.s.pickupCity} → ${r.s.deliveryCity}`, status: statusLabel(r.s.status) });
+    byDriver.set(d.id, d);
+  }
+  return { rows, live: [...byDriver.values()], freshIds };
+}
+
+export async function LiveMapPanel() {
+  const { rows, live, freshIds } = await loadFleet();
+
+  return (
+    <>
+      <h2>Live Map</h2>
+      <p className="dashboard-panel-subtext">Drivers on active deliveries, updated every few seconds while their dashboard is open.</p>
+      <div className="dashboard-stat-row">
+        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{live.length}</div><div className="dashboard-stat-label">Drivers live now</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-value">{rows.length}</div><div className="dashboard-stat-label">Active deliveries</div></div>
+      </div>
+      <FleetMap drivers={live} />
+      {live.length === 0 && <p className="sd-muted">No driver is sharing a live location right now.</p>}
+
+      {rows.length > 0 && (
+        <table className="bo-table" style={{ marginTop: 20 }}>
+          <thead><tr><th>Shipment</th><th>Route</th><th>Status</th><th>Driver</th><th>Location</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => {
+              const fresh = freshIds.has(r.s.id);
+              return (
+                <tr key={r.s.id}>
+                  <td>{r.s.trackingNumber ? <code>{r.s.trackingNumber}</code> : `#${r.s.id}`}</td>
+                  <td>{r.s.pickupCity} &rarr; {r.s.deliveryCity}</td>
+                  <td><StatusBadge status={r.s.status} /></td>
+                  <td>{r.driverName}</td>
+                  <td>
+                    {fresh ? (
+                      <span className="live-ok">&#9679; Live {timeAgo(r.at!)} ago{r.accuracy ? ` · ±${r.accuracy} m` : ""}</span>
+                    ) : (
+                      <span className="sd-muted">{r.at ? `Last seen ${timeAgo(r.at)} ago` : "No signal yet"}</span>
+                    )}
+                  </td>
+                  <td><Link href={`/backoffice?panel=shipments&view=${r.s.id}`}>View</Link></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </>
   );
 }

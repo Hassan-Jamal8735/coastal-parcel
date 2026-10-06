@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { shipments, trackingEvents, users } from "@/db/schema";
 import { ACTIVE_DELIVERY_STATUSES, SITE_TIMEZONE } from "./constants";
@@ -44,6 +44,14 @@ export async function getLiveDriverLocation(s: { driverId: number | null; status
   if (!d?.lat || !d.lng || !d.at) return null;
   if (Date.now() - d.at.getTime() > 10 * 60 * 1000) return null;
   return { lat: Number(d.lat), lng: Number(d.lng), updatedAt: d.at, accuracy: d.accuracy };
+}
+
+/** Which of these drivers sent a live position in the last 10 minutes. */
+export async function driversLiveNow(driverIds: number[]) {
+  const ids = [...new Set(driverIds)];
+  if (!ids.length) return new Set<number>();
+  const rows = await db.select({ id: users.id, at: users.lastLocationAt }).from(users).where(inArray(users.id, ids));
+  return new Set(rows.filter((r) => r.at && Date.now() - r.at.getTime() <= 10 * 60 * 1000).map((r) => r.id));
 }
 
 export function timeAgo(date: Date) {
