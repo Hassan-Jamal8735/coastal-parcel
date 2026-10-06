@@ -77,7 +77,7 @@ export function LocationPinPicker({
         if (!marker.current) {
           marker.current = L.marker([p.lat, p.lng], { icon, draggable: true }).addTo(m);
           marker.current.on("dragend", () => {
-            const ll = marker.current!.getLatLng();
+            const ll = marker.current!.getLatLng().wrap();
             onChange({ lat: ll.lat, lng: ll.lng });
             fillRef.current({ lat: ll.lat, lng: ll.lng });
           });
@@ -87,7 +87,11 @@ export function LocationPinPicker({
         if (!silent) fillRef.current(p);
       };
       placeRef.current = place;
-      m.on("click", (e: import("leaflet").LeafletMouseEvent) => place({ lat: e.latlng.lat, lng: e.latlng.lng }));
+      // wrap(): the world map repeats sideways, so a tap on a repeated copy reports e.g. lng 200; bring it back to -180..180.
+      m.on("click", (e: import("leaflet").LeafletMouseEvent) => {
+        const ll = e.latlng.wrap();
+        place({ lat: ll.lat, lng: ll.lng });
+      });
 
       if (value) {
         place(value, 17, true);

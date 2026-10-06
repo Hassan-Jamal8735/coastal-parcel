@@ -23,7 +23,11 @@ const packageSchema = z.object({
 });
 
 const pinSchema = z
-  .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+  .object({
+    lat: z.number().min(-90, "That map pin is not valid — please pin the spot again.").max(90, "That map pin is not valid — please pin the spot again."),
+    // Normalise rather than reject a longitude outside -180..180 (same spot, one more trip round the globe).
+    lng: z.number().finite().transform((v) => ((((v + 180) % 360) + 360) % 360) - 180),
+  })
   .nullable()
   .default(null);
 
