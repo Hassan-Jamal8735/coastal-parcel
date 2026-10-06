@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 export type Pin = { lat: number; lng: number };
+export type PinAddress = { address: string; city: string; postalCode: string; country: string };
 
 /**
  * Optional exact-spot pin for a pickup or delivery address. Opens a map on
@@ -17,6 +18,7 @@ export function LocationPinPicker({
   value,
   onChange,
   allowGps,
+  onAddress,
 }: {
   label: string;
   city: string;
@@ -25,13 +27,34 @@ export function LocationPinPicker({
   onChange: (pin: Pin | null) => void;
   /** Offer "Use my current location" (sensible for pickup — the sender is usually there). */
   allowGps?: boolean;
+  /** Receives the address found at the pin, to fill the form's fields. */
+  onAddress?: (found: PinAddress) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [gpsText, setGpsText] = useState("");
+  const [lookup, setLookup] = useState("");
+  const lookupSeq = useRef(0);
+
+  // Fill the address fields from the pin (latest pin wins if the customer taps quickly).
+  async function fillAddress(p: Pin) {
+    if (!onAddress) return;
+    const seq = ++lookupSeq.current;
+    setLookup("Finding the address for this spot…");
+    const res = await fetch(`/api/reverse-geocode?lat=${p.lat}&lng=${p.lng}`).catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
+    if (seq !== lookupSeq.current) return;
+    if (!res?.ok || !data || data.error) return setLookup(data?.error ?? "Could not find the address — please type it in.");
+    onAddress(data);
+    setLookup(`Address filled in: ${[data.address, data.city, data.country].filter(Boolean).join(", ")}. Please check it.`);
+  }
+  const fillRef = useRef(fillAddress);
+  useEffect(() => {
+    fillRef.current = fillAddress;
+  });
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<import("leaflet").Map | null>(null);
   const marker = useRef<import("leaflet").Marker | null>(null);
-  const placeRef = useRef<(p: Pin, zoom?: number) => void>(() => {});
+  const placeRef = useRef<(p: Pin, zoom?: number, silent?: boolean) => void>(() => {});
 
   useEffect(() => {
     if (!open || !el.current) return;
@@ -50,22 +73,24 @@ export function LocationPinPicker({
         shadowSize: [41, 41],
       });
 
-      const place = (p: Pin, zoom?: number) => {
+      const place = (p: Pin, zoom?: number, silent?: boolean) => {
         if (!marker.current) {
           marker.current = L.marker([p.lat, p.lng], { icon, draggable: true }).addTo(m);
           marker.current.on("dragend", () => {
             const ll = marker.current!.getLatLng();
             onChange({ lat: ll.lat, lng: ll.lng });
+            fillRef.current({ lat: ll.lat, lng: ll.lng });
           });
         } else marker.current.setLatLng([p.lat, p.lng]);
         if (zoom) m.setView([p.lat, p.lng], zoom);
         onChange(p);
+        if (!silent) fillRef.current(p);
       };
       placeRef.current = place;
       m.on("click", (e: import("leaflet").LeafletMouseEvent) => place({ lat: e.latlng.lat, lng: e.latlng.lng }));
 
       if (value) {
-        place(value, 17);
+        place(value, 17, true);
       } else {
         m.setView([20, 0], 2);
         if (city && country) {
@@ -125,13 +150,14 @@ export function LocationPinPicker({
         </div>
       ) : (
         <div className="pin-panel">
-          <p className="pin-help">Tap the map at the exact {label.toLowerCase()} spot, or drag the pin.</p>
+          <p className="pin-help">Tap the map at the exact {label.toLowerCase()} spot (or drag the pin) and the address fills in for you.</p>
           {allowGps && (
             <button type="button" className="dv-chip" onClick={useGps}>
               Use my current location (GPS)
             </button>
           )}
           {gpsText && <p className="pin-gps">{gpsText}</p>}
+          {lookup && <p className="pin-lookup">{lookup}</p>}
           <div ref={el} className="pin-map" />
           <div className="pin-actions">
             <button type="button" className="main-button w-button" onClick={() => setOpen(false)}>

@@ -1010,3 +1010,8 @@
   font-weight: 700;
   color: #1e7e42;
 }
+.pin-lookup {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #8a6400;
+}

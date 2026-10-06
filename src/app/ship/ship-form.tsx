@@ -113,6 +113,23 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
     const label = where === "pickup" ? "Pickup" : "Delivery";
     return (
       <>
+        <LocationPinPicker
+          label={label}
+          city={f[k("City")]}
+          country={f[k("Country")]}
+          value={f[`${where}Pin`]}
+          onChange={(pin) => setF((prev) => ({ ...prev, [`${where}Pin`]: pin }))}
+          allowGps={where === "pickup"}
+          onAddress={(found) =>
+            setF((prev) => ({
+              ...prev,
+              [k("Address")]: found.address || prev[k("Address")],
+              [k("City")]: found.city || prev[k("City")],
+              [k("PostalCode")]: found.postalCode || prev[k("PostalCode")],
+              [k("Country")]: found.country || prev[k("Country")],
+            }))
+          }
+        />
         <div className="form-field">
           <div className="label">{label} Address</div>
           <input className="field w-input" type="text" placeholder="Street address" required value={f[k("Address")]} onChange={(e) => set(k("Address"), e.target.value)} />
@@ -152,14 +169,6 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             </select>
           </div>
         </div>
-        <LocationPinPicker
-          label={label}
-          city={f[k("City")]}
-          country={f[k("Country")]}
-          value={f[`${where}Pin`]}
-          onChange={(pin) => setF((prev) => ({ ...prev, [`${where}Pin`]: pin }))}
-          allowGps={where === "pickup"}
-        />
       </>
     );
   };
