@@ -108,7 +108,7 @@ export async function addTrackingEvent(
   status: string,
   note?: string | null,
   createdBy?: number | null,
-  coords?: { lat: number; lng: number } | null,
+  coords?: { lat: number; lng: number; accuracy?: number | null } | null,
 ) {
   await db.insert(trackingEvents).values({
     shipmentId,
@@ -117,6 +117,7 @@ export async function addTrackingEvent(
     createdBy: createdBy ?? null,
     lat: coords?.lat ?? null,
     lng: coords?.lng ?? null,
+    accuracyM: coords?.accuracy ?? null,
   });
 }
 

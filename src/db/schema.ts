@@ -34,6 +34,8 @@ export const users = pgTable(
     lastLat: numeric("last_lat", { precision: 10, scale: 7, mode: "number" }),
     lastLng: numeric("last_lng", { precision: 10, scale: 7, mode: "number" }),
     lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
+    // GPS accuracy of the last fix, in metres (radius).
+    lastAccuracyM: integer("last_accuracy_m"),
     // Null until the user enters the code emailed to them; unverified
     // accounts are treated as logged out everywhere except /verify-email.
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
@@ -158,6 +160,7 @@ export const trackingEvents = pgTable(
     note: text("note"),
     lat: numeric("lat", { precision: 10, scale: 7, mode: "number" }),
     lng: numeric("lng", { precision: 10, scale: 7, mode: "number" }),
+    accuracyM: integer("accuracy_m"),
     createdBy: bigint("created_by", { mode: "number" }).references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

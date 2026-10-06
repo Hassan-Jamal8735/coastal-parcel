@@ -37,13 +37,13 @@ export async function getTrackingEvents(shipmentId: number) {
 export async function getLiveDriverLocation(s: { driverId: number | null; status: string }) {
   if (!s.driverId || !ACTIVE_DELIVERY_STATUSES.includes(s.status)) return null;
   const [d] = await db
-    .select({ lat: users.lastLat, lng: users.lastLng, at: users.lastLocationAt })
+    .select({ lat: users.lastLat, lng: users.lastLng, at: users.lastLocationAt, accuracy: users.lastAccuracyM })
     .from(users)
     .where(eq(users.id, s.driverId))
     .limit(1);
   if (!d?.lat || !d.lng || !d.at) return null;
   if (Date.now() - d.at.getTime() > 10 * 60 * 1000) return null;
-  return { lat: Number(d.lat), lng: Number(d.lng), updatedAt: d.at };
+  return { lat: Number(d.lat), lng: Number(d.lng), updatedAt: d.at, accuracy: d.accuracy };
 }
 
 export function timeAgo(date: Date) {

@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { shipments } from "@/db/schema";
+import { shipments, users } from "@/db/schema";
 import { NEXT_DRIVER_STATUS } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { notifyCustomerStatusChange } from "@/lib/email";
@@ -57,7 +57,11 @@ export async function driverUpdateStatus(formData: FormData) {
   const lat = coord(formData.get("lat"), 90);
   const lng = coord(formData.get("lng"), 180);
   const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
-  await addTrackingEvent(s.id, next, note, driver.id, lat !== null && lng !== null ? { lat, lng } : null);
+  const acc = coord(formData.get("accuracy"), 100000);
+  const coords = lat !== null && lng !== null ? { lat, lng, accuracy: acc !== null ? Math.round(acc) : null } : null;
+  await addTrackingEvent(s.id, next, note, driver.id, coords);
+  // The update's fix is also the driver's freshest live position.
+  if (coords) await db.update(users).set({ lastLat: coords.lat, lastLng: coords.lng, lastAccuracyM: coords.accuracy, lastLocationAt: new Date() }).where(eq(users.id, driver.id));
   await notifyCustomerStatusChange({ ...s, ...update } as typeof s, next);
 
   redirect("/driver-dashboard#shipments");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { accuracyLabel, startGps, useGps } from "@/lib/gps";
 
 /**
  * A driver's status-update form (WordPress .driver-status-form.cp-geolocate-form):
@@ -18,26 +19,24 @@ export function DriverStatusForm({
   nextStatus: string;
   nextLabel: string;
 }) {
-  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoText, setGeoText] = useState("Getting your location…");
+  const { status, fix } = useGps();
   const photoRef = useRef<HTMLInputElement>(null);
   const [photoName, setPhotoName] = useState("");
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off capability check on mount
-      setGeoText("Location not supported on this device");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setGeo({ lat: p.coords.latitude, lng: p.coords.longitude });
-        setGeoText("Location will be shared with this update");
-      },
-      () => setGeoText("Location unavailable — the update still works"),
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
-  }, []);
+  useEffect(() => startGps(), []);
+
+  // Only a GPS-grade fix is attached as the checkpoint; a weak one is left off rather than placing the pin wrongly.
+  const usable = fix && fix.accuracy <= 100 ? fix : null;
+  const geoText =
+    status === "denied"
+      ? "Location blocked — the update still works"
+      : status === "unsupported"
+        ? "Location not supported on this device"
+        : usable
+          ? `Location attached · ${accuracyLabel(usable.accuracy)} (±${Math.round(usable.accuracy)} m)`
+          : fix
+            ? `GPS signal weak (±${Math.round(fix.accuracy)} m) — waiting for a better fix`
+            : "Getting your GPS position…";
 
   const hasPhotoInput = nextStatus === "picked_up" || nextStatus === "delivered";
 
@@ -46,12 +45,13 @@ export function DriverStatusForm({
   return (
     <form action={action} className="driver-status-form cp-geolocate-form dv-form">
       <input type="hidden" name="shipment_id" value={shipmentId} />
-      <input type="hidden" name="lat" className="cp-lat-field" value={geo?.lat ?? ""} />
-      <input type="hidden" name="lng" className="cp-lng-field" value={geo?.lng ?? ""} />
+      <input type="hidden" name="lat" className="cp-lat-field" value={usable?.lat ?? ""} />
+      <input type="hidden" name="lng" className="cp-lng-field" value={usable?.lng ?? ""} />
+      <input type="hidden" name="accuracy" value={usable ? Math.round(usable.accuracy) : ""} />
 
       <div className="dv-form-head">
         <p className="dv-form-title">Next step: {nextLabel}</p>
-        <p className={"cp-geo-status dv-geo" + (geo ? " is-on" : "")}>{geoText}</p>
+        <p className={"cp-geo-status dv-geo" + (usable ? " is-on" : "")}>{geoText}</p>
       </div>
 
       <div className={"dv-form-fields" + (hasPhotoInput ? " has-photo" : "")}>

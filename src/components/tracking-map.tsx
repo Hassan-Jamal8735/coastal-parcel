@@ -9,7 +9,7 @@ export type MapPoint = { lat: number; lng: number; label: string };
  * plus the driver's live position as a distinct pulsing blue dot. Leaflet
  * touches `window`, so it's loaded only in the browser.
  */
-export function TrackingMap({ points, live, height = 300, radius = 12 }: { points: MapPoint[]; live?: { lat: number; lng: number } | null; height?: number; radius?: number }) {
+export function TrackingMap({ points, live, height = 300, radius = 12 }: { points: MapPoint[]; live?: { lat: number; lng: number; accuracy?: number | null } | null; height?: number; radius?: number }) {
   const el = useRef<HTMLDivElement>(null);
   const key = JSON.stringify([points, live]);
 
@@ -39,7 +39,10 @@ export function TrackingMap({ points, live, height = 300, radius = 12 }: { point
       if (latlngs.length > 1) L.polyline(latlngs, { color: "#f9b416" }).addTo(map);
       if (live) {
         const liveIcon = L.divIcon({ className: "cp-live-marker", html: '<span class="cp-live-marker-dot"></span>', iconSize: [16, 16] });
-        L.marker([live.lat, live.lng], { icon: liveIcon }).addTo(map).bindPopup("Driver’s current location");
+        const within = live.accuracy ? ` (accurate to ±${live.accuracy} m)` : "";
+        L.marker([live.lat, live.lng], { icon: liveIcon }).addTo(map).bindPopup(`Driver’s current location${within}`);
+        // The GPS accuracy radius: the driver is somewhere inside this circle.
+        if (live.accuracy) L.circle([live.lat, live.lng], { radius: live.accuracy, color: "#1c6fd9", weight: 1, fillColor: "#1c6fd9", fillOpacity: 0.12 }).addTo(map);
         latlngs.push([live.lat, live.lng]);
       }
       if (latlngs.length > 1) map.fitBounds(latlngs, { padding: [30, 30] });

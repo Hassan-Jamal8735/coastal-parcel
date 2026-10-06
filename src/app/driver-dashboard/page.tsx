@@ -132,6 +132,7 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
             <h2>Assigned Shipments</h2>
             <p className="dashboard-panel-subtext">Shipments assigned to you for pickup and delivery.</p>
             <Flash flash={flash} form="driver_shipments" />
+            {approved && <DriverLocationPing tracking={hasActive} />}
             {!approved ? (
               <div className="auth-notice">You&apos;ll be able to see assigned shipments here once your driver application is approved.</div>
             ) : list.length === 0 ? (
@@ -290,7 +291,6 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
       </div>
       <PanelSwitcher />
       {approved && <LiveRefresh interval={15000} />}
-      {hasActive && <DriverLocationPing />}
     </div>
   );
 }

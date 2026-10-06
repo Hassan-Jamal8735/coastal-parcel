@@ -17,7 +17,9 @@ export async function POST(request: Request) {
   const lat = Number(body?.lat);
   const lng = Number(body?.lng);
   if (!lat || !lng || Math.abs(lat) > 90 || Math.abs(lng) > 180) return NextResponse.json({ success: false }, { status: 400 });
+  const acc = Number(body?.accuracy);
+  const accuracy = Number.isFinite(acc) && acc > 0 ? Math.min(Math.round(acc), 100000) : null;
 
-  await db.update(users).set({ lastLat: lat, lastLng: lng, lastLocationAt: new Date() }).where(eq(users.id, user.id));
+  await db.update(users).set({ lastLat: lat, lastLng: lng, lastAccuracyM: accuracy, lastLocationAt: new Date() }).where(eq(users.id, user.id));
   return NextResponse.json({ success: true });
 }
