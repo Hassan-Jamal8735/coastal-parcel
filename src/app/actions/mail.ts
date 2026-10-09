@@ -1,12 +1,12 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 import { db } from "@/db";
 import { mailMessages } from "@/db/schema";
 import { requireRole } from "@/lib/dal";
-import { MAIL_DOMAIN, sendPortalEmail } from "@/lib/mail";
+import { MAIL_FROM, sendPortalEmail } from "@/lib/mail";
 
 /** The mailbox is the owner's: admin accounts only. */
 const requireAdmin = () => requireRole("admin");
@@ -25,8 +25,6 @@ function back(params: string): never {
 
 export async function mailSend(formData: FormData) {
   await requireAdmin();
-  const local = String(formData.get("from_local") ?? "info").trim().toLowerCase();
-  const name = String(formData.get("from_name") ?? "Coastal Parcel").trim().replace(/[<>"]/g, "") || "Coastal Parcel";
   const to = addressList(formData.get("to"));
   const cc = addressList(formData.get("cc"));
   const subject = String(formData.get("subject") ?? "").trim().slice(0, 300);
@@ -35,7 +33,6 @@ export async function mailSend(formData: FormData) {
   const replyId = String(formData.get("reply_id") ?? "");
   const retry = replyId ? `compose=1&reply=${replyId}` : "compose=1";
 
-  if (!/^[a-z0-9._-]{1,64}$/.test(local)) back(`${retry}&error=from`);
   const email = z.email();
   if (!to.length || [...to, ...cc].some((a) => !email.safeParse(a).success)) back(`${retry}&error=to`);
   if (!subject || !text) back(`${retry}&error=empty`);
@@ -45,7 +42,7 @@ export async function mailSend(formData: FormData) {
 
   try {
     await sendPortalEmail({
-      from: `${name} <${local}@${MAIL_DOMAIN}>`,
+      from: MAIL_FROM,
       to,
       cc,
       subject,
@@ -70,6 +67,15 @@ export async function mailRestore(formData: FormData) {
   await requireAdmin();
   await db.update(mailMessages).set({ trashedAt: null }).where(eq(mailMessages.id, Number(formData.get("id"))));
   back("folder=trash&saved=restored");
+}
+
+export async function mailMarkAllRead() {
+  await requireAdmin();
+  await db
+    .update(mailMessages)
+    .set({ readAt: new Date() })
+    .where(and(eq(mailMessages.direction, "in"), isNull(mailMessages.readAt), isNull(mailMessages.trashedAt)));
+  back("folder=inbox&saved=allread");
 }
 
 export async function mailMarkUnread(formData: FormData) {

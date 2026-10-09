@@ -1,10 +1,12 @@
 import { and, count, desc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import Link from "next/link";
-import { mailMarkUnread, mailRestore, mailSend, mailTrash } from "@/app/actions/mail";
+import { mailMarkAllRead, mailMarkUnread, mailRestore, mailSend, mailTrash } from "@/app/actions/mail";
+import { LiveRefresh } from "@/components/live-refresh";
+import { MailUnreadCount } from "@/components/mail-unread";
 import { db } from "@/db";
 import { mailMessages } from "@/db/schema";
 import { SITE_TIMEZONE } from "@/lib/constants";
-import { MAIL_DOMAIN, syncReceived } from "@/lib/mail";
+import { MAIL_DOMAIN, MAIL_FROM, syncReceived } from "@/lib/mail";
 import { formatDateTime } from "@/lib/tracking";
 
 /** Back Office mailbox: everything received at and sent from @coastalparcel.com. */
@@ -24,7 +26,7 @@ const ERRORS: Record<string, string> = {
   size: "Attachments are too large. Keep them under 3.5 MB in total.",
   send: "The email could not be sent. Please try again.",
 };
-const SAVED: Record<string, string> = { sent: "Email sent.", trashed: "Moved to Trash.", restored: "Restored." };
+const SAVED: Record<string, string> = { sent: "Email sent.", trashed: "Moved to Trash.", restored: "Restored.", allread: "All emails marked as read." };
 
 function folderWhere(folder: Folder): SQL {
   if (folder === "trash") return isNotNull(mailMessages.trashedAt);
@@ -83,7 +85,7 @@ export async function MailPanel(q: { folder?: string; view?: string; compose?: s
           {FOLDERS.map(([key, label]) => (
             <Link key={key} href={`/backoffice?panel=mail&folder=${key}`} className={"mail-folder" + (folder === key && !q.compose ? " active" : "")}>
               {label}
-              {key === "inbox" && unread.n > 0 && <span className="mail-count">{unread.n}</span>}
+              {key === "inbox" && <MailUnreadCount initial={unread.n} />}
             </Link>
           ))}
         </nav>
@@ -126,6 +128,7 @@ async function MessageList({ folder, search }: { folder: Folder; search: string 
 
   return (
     <>
+      <div className="mail-toolbar">
       <form className="mail-search" action="/backoffice" method="get">
         <input type="hidden" name="panel" value="mail" />
         <input type="hidden" name="folder" value={folder} />
@@ -134,6 +137,14 @@ async function MessageList({ folder, search }: { folder: Folder; search: string 
           Search
         </button>
       </form>
+      {folder === "inbox" && rows.some((m) => !m.readAt) && (
+        <form action={mailMarkAllRead}>
+          <button type="submit" className="dv-chip">Mark all as read</button>
+        </form>
+      )}
+      </div>
+      {/* New mail appears on its own (paused while typing a search). */}
+      {folder === "inbox" && <LiveRefresh interval={15000} />}
       {rows.length === 0 ? (
         <div className="dashboard-empty-state">
           <p>{search ? "No emails match your search." : folder === "inbox" ? "No emails received yet." : "Nothing here yet."}</p>
@@ -240,9 +251,6 @@ async function Compose({ replyId }: { replyId: number }) {
   const [original] = replyId ? await db.select().from(mailMessages).where(eq(mailMessages.id, replyId)).limit(1) : [];
   const replyTo = original ? bareAddress(original.replyTo ?? original.fromAddress) : "";
   const subject = original ? (/^re:/i.test(original.subject) ? original.subject : `Re: ${original.subject}`) : "";
-  // Reply from the address it was sent to, when that's one of ours.
-  const ourAddress = original?.toAddresses.map(bareAddress).find((a) => a.toLowerCase().endsWith(`@${MAIL_DOMAIN}`));
-  const fromLocal = ourAddress ? ourAddress.split("@")[0] : "info";
   const quoted = original
     ? `\n\n\nOn ${formatDateTime(original.createdAt)}, ${original.fromAddress} wrote:\n${(original.text ?? "")
         .split("\n")
@@ -260,12 +268,8 @@ async function Compose({ replyId }: { replyId: number }) {
         </>
       )}
       <div className="mail-compose-row">
-        <label htmlFor="from_name">From</label>
-        <div className="mail-from">
-          <input id="from_name" name="from_name" defaultValue="Coastal Parcel" aria-label="Sender name" />
-          <input name="from_local" defaultValue={fromLocal} aria-label="Address" required />
-          <span>@{MAIL_DOMAIN}</span>
-        </div>
+        <label>From</label>
+        <span className="mail-from-fixed">{MAIL_FROM}</span>
       </div>
       <div className="mail-compose-row">
         <label htmlFor="to">To</label>

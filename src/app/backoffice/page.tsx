@@ -6,6 +6,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { mailMessages } from "@/db/schema";
 import { requireRole } from "@/lib/dal";
+import { MailUnreadCount } from "@/components/mail-unread";
 import { MailPanel } from "./mail-panel";
 import {
   CustomersPanel,
@@ -64,7 +65,7 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
             {panels.map(([key, label]) => (
               <Link key={key} href={`/backoffice?panel=${key}`} className={"dashboard-nav-link" + (panel === key ? " active" : "")}>
                 {label}
-                {key === "mail" && unreadMail.n > 0 && <span className="mail-count">{unreadMail.n}</span>}
+                {key === "mail" && <MailUnreadCount initial={unreadMail.n} />}
               </Link>
             ))}
           </nav>

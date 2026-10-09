@@ -1335,3 +1335,22 @@
     grid-row: 2;
   }
 }
+.mail-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.mail-toolbar .mail-search {
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
+}
+.mail-toolbar form {
+  margin: 0;
+}
+.mail-from-fixed {
+  font-size: 14px;
+  color: #333;
+}

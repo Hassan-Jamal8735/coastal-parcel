@@ -13,6 +13,8 @@ import { env } from "./env";
 
 const API = "https://api.resend.com";
 export const MAIL_DOMAIN = "coastalparcel.com";
+/** Every email written in the portal goes out from the one shared address. */
+export const MAIL_FROM = `Coastal Parcel <info@${MAIL_DOMAIN}>`;
 
 async function resend(path: string, init?: RequestInit) {
   const key = env("RESEND_API_KEY");
