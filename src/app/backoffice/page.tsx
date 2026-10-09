@@ -2,7 +2,11 @@ import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { AppHeader } from "@/components/app-header";
 import { LiveRefresh } from "@/components/live-refresh";
+import { and, count, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { mailMessages } from "@/db/schema";
 import { requireRole } from "@/lib/dal";
+import { MailPanel } from "./mail-panel";
 import {
   CustomersPanel,
   DriversPanel,
@@ -26,15 +30,24 @@ const PANELS = [
   ["pricing", "Pricing"],
   ["reports", "Reports"],
   ["messages", "Messages"],
+  ["mail", "Mail"],
   ["staff", "Staff Accounts"],
 ] as const;
 
-type Query = { panel?: string; view?: string; saved?: string; error?: string };
+type Query = { panel?: string; view?: string; saved?: string; error?: string; folder?: string; compose?: string; reply?: string; q?: string };
+
+/** Sections only an admin sees (the mailbox is the owner's). */
+const ADMIN_ONLY = new Set(["mail"]);
 
 export default async function BackofficePage({ searchParams }: { searchParams: Promise<Query> }) {
   const user = await requireRole("staff", "admin");
   const q = await searchParams;
-  const panel = PANELS.some(([key]) => key === q.panel) ? q.panel! : "overview";
+  const isAdmin = user.role === "admin";
+  const panels = PANELS.filter(([key]) => isAdmin || !ADMIN_ONLY.has(key));
+  const panel = panels.some(([key]) => key === q.panel) ? q.panel! : "overview";
+  const [unreadMail] = isAdmin
+    ? await db.select({ n: count() }).from(mailMessages).where(and(eq(mailMessages.direction, "in"), isNull(mailMessages.readAt), isNull(mailMessages.trashedAt)))
+    : [{ n: 0 }];
   const view = Number(q.view) || 0;
   const saved = q.saved !== undefined;
 
@@ -48,9 +61,10 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
             <p className="dashboard-user-role">Back Office</p>
           </div>
           <nav className="dashboard-nav">
-            {PANELS.map(([key, label]) => (
+            {panels.map(([key, label]) => (
               <Link key={key} href={`/backoffice?panel=${key}`} className={"dashboard-nav-link" + (panel === key ? " active" : "")}>
                 {label}
+                {key === "mail" && unreadMail.n > 0 && <span className="mail-count">{unreadMail.n}</span>}
               </Link>
             ))}
           </nav>
@@ -71,6 +85,7 @@ export default async function BackofficePage({ searchParams }: { searchParams: P
             {panel === "pricing" && <PricingPanel saved={saved} error={q.error} />}
             {panel === "reports" && <ReportsPanel />}
             {panel === "messages" && <MessagesPanel />}
+            {panel === "mail" && isAdmin && <MailPanel {...q} />}
             {panel === "staff" && <StaffPanel saved={saved} error={q.error} currentUserId={user.id} />}
           </div>
         </main>

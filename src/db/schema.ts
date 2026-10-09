@@ -206,3 +206,33 @@ export const settings = pgTable("settings", {
   value: jsonb("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// The Back Office mailbox: every email received at @coastalparcel.com (via
+// Resend inbound) and every email sent (by the site or written in the portal).
+export type MailAttachment = { filename: string; contentType: string; size: number; url: string | null };
+
+export const mailMessages = pgTable(
+  "mail_messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    direction: varchar("direction", { length: 3 }).notNull(), // "in" | "out"
+    // "system" = sent automatically by the website (codes, status updates); "manual" = written in the portal.
+    kind: varchar("kind", { length: 10 }).notNull().default("manual"),
+    resendId: varchar("resend_id", { length: 64 }),
+    fromAddress: text("from_address").notNull(),
+    toAddresses: jsonb("to_addresses").$type<string[]>().notNull().default([]),
+    ccAddresses: jsonb("cc_addresses").$type<string[]>().notNull().default([]),
+    replyTo: text("reply_to"),
+    subject: text("subject").notNull().default(""),
+    text: text("text"),
+    html: text("html"),
+    messageId: text("message_id"),
+    inReplyTo: text("in_reply_to"),
+    attachments: jsonb("attachments").$type<MailAttachment[]>().notNull().default([]),
+    status: varchar("status", { length: 20 }).notNull().default("sent"), // in: received · out: sent, delivered, bounced, failed
+    readAt: timestamp("read_at", { withTimezone: true }),
+    trashedAt: timestamp("trashed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("mail_resend_idx").on(t.resendId), index("mail_list_idx").on(t.direction, t.createdAt)],
+);

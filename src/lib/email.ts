@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { formatMoney, serviceLabel, statusLabel } from "./constants";
 import { renderEmail, SITE, type EmailContent } from "./email-template";
+import { logOutgoing } from "./mail";
 import type { Shipment } from "./shipments";
 import { env } from "@/lib/env";
 
@@ -49,6 +50,9 @@ async function deliver({ to, subject, content, replyTo }: Message): Promise<bool
         console.error("Email send failed (Resend)", res.status, await res.text());
         return false;
       }
+      // Copy into the Back Office mailbox (System folder).
+      const sent = await res.json().catch(() => null);
+      await logOutgoing({ resendId: sent?.id ?? null, kind: "system", from: env("EMAIL_FROM") ?? "Coastal Parcel <noreply@coastalparcel.com>", to: [to], replyTo, subject, html, text });
       return true;
     } else if (env("MAIL_HOST") && env("MAIL_USERNAME")) {
       const nodemailer = await import("nodemailer");
