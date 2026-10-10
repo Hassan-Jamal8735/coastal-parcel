@@ -155,6 +155,11 @@ export default async function DriverDashboardPage({ searchParams }: { searchPara
                         <div>
                           <div className="dv-ref">
                             <span className="shipment-tracking-number">{ref}</span>
+                            {s.trackingNumber && (
+                              <a href={`/print/label/${s.id}`} target="_blank" rel="noopener" className="dv-print">
+                                Print label
+                              </a>
+                            )}
                             <span className="dv-date">
                               {s.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SITE_TIMEZONE })}
                             </span>

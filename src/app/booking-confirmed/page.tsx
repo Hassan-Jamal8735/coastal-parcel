@@ -29,6 +29,14 @@ export default async function BookingConfirmedPage({ searchParams }: { searchPar
               <Link href={`/track-shipment?tracking=${s.trackingNumber}`} className="button-2 w-button">
                 Track This Shipment
               </Link>
+              <p className="booking-print-links">
+                <a href={`/print/receipt/${s.id}`} target="_blank" rel="noopener">
+                  Print receipt
+                </a>
+                <a href={`/print/label/${s.id}`} target="_blank" rel="noopener">
+                  Print shipping label
+                </a>
+              </p>
               {!isGuest && (
                 <>
                   <div className="spacer-20" />

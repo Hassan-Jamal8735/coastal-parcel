@@ -8,6 +8,7 @@ import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
 import { ACTIVE_DELIVERY_STATUSES, COUNTRIES, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { PRINTABLE_STATUSES } from "@/lib/print-statuses";
 import { getCountryRates, getPricingSettings, type CountryRates } from "@/lib/pricing";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
 
@@ -163,10 +164,18 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
             <span className="sd-muted">Booked {formatDateTime(s.createdAt)}</span>
           </div>
         </div>
-        {s.trackingNumber && (
-          <Link href={`/track-shipment?tracking=${s.trackingNumber}`} className="sd-header-link" target="_blank">
-            View public tracking &rarr;
-          </Link>
+        {s.trackingNumber && PRINTABLE_STATUSES.includes(s.status) && (
+          <div className="sd-header-actions">
+            <a href={`/print/label/${s.id}`} target="_blank" rel="noopener" className="dv-chip">
+              Print label
+            </a>
+            <a href={`/print/receipt/${s.id}`} target="_blank" rel="noopener" className="dv-chip">
+              Print receipt
+            </a>
+            <Link href={`/track-shipment?tracking=${s.trackingNumber}`} className="sd-header-link" target="_blank">
+              View public tracking &rarr;
+            </Link>
+          </div>
         )}
       </div>
       {saved && <div className="dashboard-success">Shipment updated.</div>}

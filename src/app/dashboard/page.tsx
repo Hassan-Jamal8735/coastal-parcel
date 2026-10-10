@@ -8,6 +8,7 @@ import { PanelSwitcher } from "@/components/panel-switcher";
 import { db } from "@/db";
 import { shipments } from "@/db/schema";
 import { ACTIVE_DELIVERY_STATUSES, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { PRINTABLE_STATUSES } from "@/lib/print-statuses";
 import { driversLiveNow } from "@/lib/tracking";
 import { requireRole } from "@/lib/dal";
 import { flashFor } from "@/lib/flash";
@@ -108,6 +109,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         <>
                           <span className="shipment-tracking-number">{s.trackingNumber}</span>
                           <Link href={`/track-shipment?tracking=${s.trackingNumber}`} style={{ textDecoration: "underline", fontSize: 13.5 }}>Track</Link>
+                          {PRINTABLE_STATUSES.includes(s.status) && (
+                            <>
+                              <a href={`/print/receipt/${s.id}`} target="_blank" rel="noopener" style={{ textDecoration: "underline", fontSize: 13.5 }}>Receipt</a>
+                              <a href={`/print/label/${s.id}`} target="_blank" rel="noopener" style={{ textDecoration: "underline", fontSize: 13.5 }}>Label</a>
+                            </>
+                          )}
                         </>
                       ) : null}
                     </div>
