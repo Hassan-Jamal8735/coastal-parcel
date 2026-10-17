@@ -7,10 +7,11 @@ import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
 import { LocationPinPicker } from "@/components/location-pin-picker";
 import { useDraft } from "@/lib/use-draft";
-import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES } from "@/lib/constants";
+import { WeightUnitToggle } from "@/components/weight-unit";
+import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES, fromKg, LB_PER_KG, toKg, type WeightUnit } from "@/lib/constants";
 import { PhoneInput } from "@/components/phone-input";
 
-type PackageRow = { description: string; weight: string; pieces: string; length: string; width: string; height: string };
+type PackageRow = { description: string; packageType: string; weight: string; pieces: string; length: string; width: string; height: string };
 
 export type Pin = { lat: number; lng: number };
 
@@ -34,6 +35,7 @@ export type ShipFormInitial = {
   deliveryCountry: string;
   pickupPin: Pin | null;
   deliveryPin: Pin | null;
+  weightUnit: WeightUnit;
   packages: PackageRow[];
   shipmentPurpose: string;
   shipmentReference: string;
@@ -42,9 +44,9 @@ export type ShipFormInitial = {
   notes: string;
 };
 
-const blankPackage: PackageRow = { description: "", weight: "", pieces: "1", length: "", width: "", height: "" };
+const blankPackage: PackageRow = { description: "", packageType: "", weight: "", pieces: "1", length: "", width: "", height: "" };
 
-export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGuest: boolean }) {
+export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFormInitial; isGuest: boolean; packageCharges: Record<string, number> }) {
   // Kept across a page refresh (cleared once submitted).
   const [f, setF, clearDraft] = useDraft(`cp-ship-draft:${initial.id ?? "new"}`, initial);
   const [error, setError] = useState("");
@@ -60,6 +62,31 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
 
   const totalWeight = f.packages.reduce((s, p) => s + (parseFloat(p.weight) || 0) * (parseInt(p.pieces) || 0), 0);
   const totalPieces = f.packages.reduce((s, p) => s + (parseInt(p.pieces) || 0), 0);
+  const unit = f.weightUnit;
+  const totalKg = toKg(totalWeight, unit);
+  const handling = f.packages.reduce((s, p) => s + (p.packageType ? (packageCharges[p.packageType] ?? 0) * (parseInt(p.pieces) || 0) : 0), 0);
+
+  /** A postal code typed before the city fills the city in (country must be chosen). */
+  async function fillCityFromPostal(where: "pickup" | "delivery", code: string) {
+    const country = f[`${where}Country`];
+    if (!code.trim() || !country || f[`${where}City`].trim()) return;
+    const res = await fetch(`/api/postal?code=${encodeURIComponent(code.trim())}&country=${encodeURIComponent(country)}`).catch(() => null);
+    const data = res?.ok ? await res.json() : null;
+    if (data?.city) setF((prev) => (prev[`${where}City`].trim() ? prev : { ...prev, [`${where}City`]: data.city }));
+  }
+
+  /** Switching kg ↔ lb converts the weights already typed, so nothing changes size. */
+  function switchUnit(next: WeightUnit) {
+    if (next === unit) return;
+    setF((prev) => ({
+      ...prev,
+      weightUnit: next,
+      packages: prev.packages.map((p) => {
+        const n = parseFloat(p.weight);
+        return n > 0 ? { ...p, weight: String(Math.round(fromKg(toKg(n, unit), next) * 100) / 100) } : p;
+      }),
+    }));
+  }
   const today = new Date().toISOString().slice(0, 10);
 
   async function runEstimate(cur = currency) {
@@ -71,7 +98,7 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pricingMethod: f.pricingMethod,
-          weightKg: totalWeight,
+          weightKg: totalKg,
           distanceKm: f.distanceKm,
           originCity: f.pickupCity,
           originCountry: f.pickupCountry,
@@ -150,8 +177,17 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             />
           </div>
           <div className="form-field">
-            <div className="label">Postal Code</div>
-            <input className="field w-input" type="text" placeholder="Optional" value={f[k("PostalCode")]} onChange={(e) => set(k("PostalCode"), e.target.value)} />
+            <div className="label">Postal / ZIP Code</div>
+            <input
+              className="field w-input"
+              type="text"
+              placeholder={where === "pickup" ? "e.g. 100001" : "e.g. SW1A 1AA"}
+              autoComplete="postal-code"
+              maxLength={20}
+              value={f[k("PostalCode")]}
+              onChange={(e) => set(k("PostalCode"), e.target.value)}
+              onBlur={(e) => fillCityFromPostal(where, e.target.value)}
+            />
           </div>
           <div className="form-field">
             <div className="label">{label} Country</div>
@@ -270,7 +306,10 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
                     <input className="field w-input" type="text" placeholder="e.g. Clothes" value={p.description} onChange={(e) => setPkg(i, { description: e.target.value })} />
                   </div>
                   <div className="form-field">
-                    <div className="label">Weight per piece (kg)</div>
+                    <div className="label">
+                      Weight per piece ({unit})
+                      {i === 0 && <WeightUnitToggle value={unit} onChange={switchUnit} />}
+                    </div>
                     <input className="field w-input" type="number" step="0.1" min="0.1" required value={p.weight} onChange={(e) => setPkg(i, { weight: e.target.value })} />
                   </div>
                   <div className="form-field">
@@ -289,10 +328,19 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
                       ))}
                     </div>
                     <BoxPresets
-                      active={presets[i]}
+                      active={presets[i] ?? (p.packageType || undefined)}
+                      charges={packageCharges}
                       onPick={(b) => {
                         setPresets((prev) => ({ ...prev, [i]: b.key }));
-                        setPkg(i, { length: String(b.l), width: String(b.w), height: String(b.h), weight: String(b.weight) });
+                        setPkg(i, {
+                          packageType: b.key,
+                          description: p.description || b.label,
+                          length: String(b.l),
+                          width: String(b.w),
+                          height: String(b.h),
+                          // Barrels have no typical weight: keep what was typed.
+                          ...(b.weight != null ? { weight: String(Math.round(fromKg(b.weight, unit) * 100) / 100) } : {}),
+                        });
                       }}
                     />
                   </>
@@ -309,7 +357,14 @@ export function ShipForm({ initial, isGuest }: { initial: ShipFormInitial; isGue
             + Add Another Package
           </button>
           <div className="cp-packages-total">
-            Total: <strong>{totalPieces}</strong> piece(s), <strong>{totalWeight.toFixed(2)}</strong> kg
+            Total: <strong>{totalPieces}</strong> piece(s), <strong>{totalWeight.toFixed(2)}</strong> {unit}
+            {totalWeight > 0 && <span className="p-light"> ({unit === "kg" ? `${(totalKg * LB_PER_KG).toFixed(1)} lb` : `${totalKg.toFixed(2)} kg`})</span>}
+            {handling > 0 && (
+              <>
+                {" "}
+                &middot; Package handling: <strong>&#8358;{handling.toLocaleString("en-US")}</strong>
+              </>
+            )}
           </div>
         </ShipCardSection>
 

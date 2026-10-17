@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
-import { COUNTRIES } from "@/lib/constants";
+import { COUNTRIES, fromKg, toKg, type WeightUnit } from "@/lib/constants";
 import { useDraft } from "@/lib/use-draft";
+import { WeightUnitToggle } from "@/components/weight-unit";
 
-type Quote = { displayAmount: number; currencySymbol: string; distanceKm: number; route: string; error?: string };
+type Quote = { displayAmount: number; currencySymbol: string; distanceKm: number; route: string; handlingNgn?: number; error?: string };
 type Loc = { country: string; city: string; postal: string };
 
 function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc: Loc; setLoc: React.Dispatch<React.SetStateAction<Loc>>; placeholder: string }) {
@@ -39,8 +40,24 @@ function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc
           />
         </div>
         <div className="form-field">
-          <div className="label">Postal Code</div>
-          <input className="field w-input" type="text" placeholder="Optional" value={loc.postal} onChange={(e) => setLoc((l) => ({ ...l, postal: e.target.value }))} />
+          <div className="label">Postal / ZIP Code</div>
+          <input
+            className="field w-input"
+            type="text"
+            placeholder="e.g. 100001"
+            autoComplete="postal-code"
+            maxLength={20}
+            value={loc.postal}
+            onChange={(e) => setLoc((l) => ({ ...l, postal: e.target.value }))}
+            onBlur={async (e) => {
+              // A postal code typed before the city fills the city in.
+              const code = e.target.value.trim();
+              if (!code || !loc.country || loc.city.trim()) return;
+              const res = await fetch(`/api/postal?code=${encodeURIComponent(code)}&country=${encodeURIComponent(loc.country)}`).catch(() => null);
+              const data = res?.ok ? await res.json() : null;
+              if (data?.city) setLoc((l) => (l.city.trim() ? l : { ...l, city: data.city }));
+            }}
+          />
         </div>
       </div>
       <label className="shipnow-checkbox-row">
@@ -51,7 +68,7 @@ function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc
   );
 }
 
-export function QuoteForm({ prefill }: { prefill: Record<string, string | undefined> }) {
+export function QuoteForm({ prefill, packageCharges }: { prefill: Record<string, string | undefined>; packageCharges: Record<string, number> }) {
   const [origin, setOrigin] = useDraft<Loc>("cp-quote-origin", { country: prefill.origin_country ?? "", city: prefill.origin_city ?? "", postal: prefill.origin_postal ?? "" });
   const [dest, setDest] = useDraft<Loc>("cp-quote-dest", { country: prefill.dest_country ?? "", city: prefill.dest_city ?? "", postal: prefill.dest_postal ?? "" });
   const [pkg, setPkg] = useDraft("cp-quote-pkg", {
@@ -60,8 +77,10 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
     length: prefill.length ?? "",
     width: prefill.width ?? "",
     height: prefill.height ?? "",
+    unit: (prefill.unit === "lb" ? "lb" : "kg") as WeightUnit,
+    packageType: prefill.package_type ?? "",
   });
-  const [preset, setPreset] = useState<string>();
+  const preset = pkg.packageType || undefined;
   const [showItem, setShowItem] = useDraft("cp-quote-open", Boolean(prefill.origin_city));
   const [locError, setLocError] = useState("");
   const [error, setError] = useState("");
@@ -88,7 +107,10 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pricingMethod: "location",
-          weightKg: weight,
+          // Weight is per piece, in the unit chosen; the server prices in kg.
+          weightKg: toKg(weight, pkg.unit) * pkg.quantity,
+          packageType: pkg.packageType || undefined,
+          pieces: pkg.quantity,
           originCity: origin.city.trim(),
           originCountry: origin.country,
           destinationCity: dest.city.trim(),
@@ -110,7 +132,7 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
     } finally {
       setLoading(false);
     }
-  }, [locationsReady, pkg.weight, origin, dest]);
+  }, [locationsReady, pkg.weight, pkg.unit, pkg.quantity, pkg.packageType, origin, dest]);
 
   // Opening a shared quote link reproduces the same quote automatically.
   const autoRan = useRef(false);
@@ -127,6 +149,8 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
       new URLSearchParams({
         pricing_method: "location",
         package_weight: pkg.weight,
+        weight_unit: pkg.unit,
+        package_type: pkg.packageType,
         package_pieces: String(pkg.quantity),
         package_length: pkg.length,
         package_width: pkg.width,
@@ -145,6 +169,8 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
   function shareUrl() {
     const p = new URLSearchParams({
       weight: pkg.weight,
+      unit: pkg.unit,
+      package_type: pkg.packageType,
       quantity: String(pkg.quantity),
       length: pkg.length,
       width: pkg.width,
@@ -188,7 +214,16 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
         <p className="shipnow-block-label">Shipment</p>
         <div className="form-row-3col">
           <div className="form-field">
-            <div className="label">Weight (kg)</div>
+            <div className="label">
+              Weight per piece ({pkg.unit})
+              <WeightUnitToggle
+                value={pkg.unit}
+                onChange={(u) => {
+                  const n = parseFloat(pkg.weight);
+                  setPkg({ ...pkg, unit: u, weight: n > 0 && u !== pkg.unit ? String(Math.round(fromKg(toKg(n, pkg.unit), u) * 100) / 100) : pkg.weight });
+                }}
+              />
+            </div>
             <input className="field w-input" type="number" step="0.1" min="0.1" value={pkg.weight} onChange={(e) => setPkg({ ...pkg, weight: e.target.value })} />
           </div>
           <div className="form-field">
@@ -215,9 +250,17 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
         </div>
         <BoxPresets
           active={preset}
+          charges={packageCharges}
           onPick={(b) => {
-            setPreset(b.key);
-            setPkg({ ...pkg, length: String(b.l), width: String(b.w), height: String(b.h), weight: String(b.weight) });
+            setPkg({
+              ...pkg,
+              packageType: b.key,
+              length: String(b.l),
+              width: String(b.w),
+              height: String(b.h),
+              // Barrels have no typical weight: keep what was typed.
+              ...(b.weight != null ? { weight: String(Math.round(fromKg(b.weight, pkg.unit) * 100) / 100) } : {}),
+            });
           }}
         />
         <button type="button" className="shipnow-btn shipnow-btn-solid shipnow-get-quote" onClick={getQuote} disabled={loading}>
@@ -243,6 +286,7 @@ export function QuoteForm({ prefill }: { prefill: Record<string, string | undefi
               <p className="shipnow-quote-meta">
                 {quotes[key].route} — {quotes[key].distanceKm} km · {eta}
                 {extra}
+                {quotes[key].handlingNgn ? ` · includes ₦${quotes[key].handlingNgn!.toLocaleString("en-US")} package handling` : ""}
               </p>
               <Link href={shipUrl(key)} className="shipnow-btn shipnow-btn-solid">
                 Complete Shipment Details &rarr;

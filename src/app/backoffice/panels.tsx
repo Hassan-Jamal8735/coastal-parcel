@@ -1,15 +1,16 @@
 import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
-import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
+import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boSavePackageCharges, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FleetMap, type FleetDriver } from "@/components/fleet-map";
 import { TrackingMap, type MapPoint } from "@/components/tracking-map";
 import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
-import { ACTIVE_DELIVERY_STATUSES, COUNTRIES, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
+import { ACTIVE_DELIVERY_STATUSES, BOX_PRESETS, COUNTRIES, packageTypeLabel, weightBoth, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { PRINTABLE_STATUSES } from "@/lib/print-statuses";
 import { getCountryRates, getPricingSettings, type CountryRates } from "@/lib/pricing";
+import { getPackages } from "@/lib/shipments";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
 
 /** Panels of /backoffice — ports of the cp_bo_render_* functions in WordPress inc/backoffice.php. */
@@ -138,10 +139,11 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
   if (!row) return <p>Shipment not found.</p>;
   const { s } = row;
 
-  const [events, live, approvedDrivers] = await Promise.all([
+  const [events, live, approvedDrivers, packages] = await Promise.all([
     getTrackingEvents(s.id),
     getLiveDriverLocation(s, { anyStatus: true }),
     db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.role, "driver"), eq(users.driverStatus, "approved"))).orderBy(users.name),
+    getPackages(s.id),
   ]);
   const points: MapPoint[] = events
     .filter((e) => e.lat != null && e.lng != null)
@@ -241,7 +243,13 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
               <Fact label="Service">{serviceLabel(s.serviceType ?? "") || "—"}</Fact>
               <Fact label="Contents">{s.isDocument ? "Document" : "Package"}</Fact>
               <Fact label="Pieces">{s.packagePieces || 1}</Fact>
-              <Fact label="Total weight">{s.packageWeight} kg</Fact>
+              <Fact label="Total weight">{weightBoth(s.packageWeight)}</Fact>
+              <Fact label="Packages" wide>
+                {packages
+                  .map((p) => `${p.pieces} × ${packageTypeLabel(p.packageType) ?? p.description ?? "Package"} · ${weightBoth(p.weight)} each`)
+                  .join("; ") || "—"}
+              </Fact>
+              {s.packageChargesNgn > 0 && <Fact label="Package handling">{naira(s.packageChargesNgn)}</Fact>}
               <Fact label="Purpose">{purpose || "—"}</Fact>
               <Fact label="Reference">{s.shipmentReference || "—"}</Fact>
               <Fact label="Price">
@@ -564,6 +572,24 @@ export async function PricingPanel({ saved, error }: { saved: boolean; error?: s
         <form action={boSavePricing}>
           <RateFields prefix="default" rates={rates} />
           <input type="submit" className="main-button w-button" value="Save default rates" />
+        </form>
+      </div>
+
+      <div className="bo-card" id="packages">
+        <h3>Package type charges</h3>
+        <p className="sd-muted">
+          A fixed handling charge added for each piece of that type, on top of the distance and weight price (e.g. barrels). Leave 0 for no extra charge.
+        </p>
+        <form action={boSavePackageCharges}>
+          <div className="pr-fields">
+            {BOX_PRESETS.map((b) => (
+              <div key={b.key} className="dashboard-form-field">
+                <label htmlFor={`charge-${b.key}`}>{b.label} (NGN each)</label>
+                <input id={`charge-${b.key}`} type="number" step="0.01" min="0" name={`charge_${b.key}`} defaultValue={rates.packageCharges[b.key] ?? 0} />
+              </div>
+            ))}
+          </div>
+          <input type="submit" className="main-button w-button" value="Save package charges" />
         </form>
       </div>
 

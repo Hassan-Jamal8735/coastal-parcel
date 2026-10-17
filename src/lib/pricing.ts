@@ -13,6 +13,8 @@ export const DEFAULT_PRICING = {
   ratePerKmNgn: 350,
   ratePerKgNgn: 500,
   pickupFeeNgn: 1500,
+  // Fixed handling charge per piece of a package type (e.g. a barrel), set in Back Office → Pricing.
+  packageCharges: {} as Record<string, number>,
   serviceMultipliers: { air: 1.3, land: 1.0, ocean: 0.85, door_to_door: 1.2 } as Record<ServiceType, number>,
   addons: {
     signature: {
@@ -62,7 +64,13 @@ export async function getPricingSettings(originCountry?: string): Promise<Pricin
     ...own,
     serviceMultipliers: { ...DEFAULT_PRICING.serviceMultipliers, ...saved.serviceMultipliers },
     addons: { ...DEFAULT_PRICING.addons, ...saved.addons },
+    packageCharges: { ...DEFAULT_PRICING.packageCharges, ...saved.packageCharges },
   };
+}
+
+/** Handling charges for a set of packages: each piece of a type with a charge adds it. */
+export function packageChargesNgn(rates: PricingSettings, packages: { packageType?: string | null; pieces: number }[]) {
+  return packages.reduce((sum, p) => sum + (p.packageType ? (rates.packageCharges[p.packageType] ?? 0) * Math.max(1, p.pieces) : 0), 0);
 }
 
 export function basePriceNgn(rates: PricingSettings, weightKg: number, distanceKm: number) {
@@ -76,19 +84,21 @@ export function basePriceNgn(rates: PricingSettings, weightKg: number, distanceK
  */
 export function calculateFinalPrice(
   rates: PricingSettings,
-  input: { weightKg: number; distanceKm: number; fulfillment: string; serviceType?: string; addons?: string[] },
+  input: { weightKg: number; distanceKm: number; fulfillment: string; serviceType?: string; addons?: string[]; packageCharges?: number },
 ) {
   const base = basePriceNgn(rates, input.weightKg, input.distanceKm);
   const multiplier = input.serviceType ? rates.serviceMultipliers[input.serviceType as ServiceType] ?? 1 : 1;
   const service = base * multiplier;
   const addonsTotal = (input.addons ?? []).reduce((sum, key) => sum + (rates.addons[key]?.priceNgn ?? 0), 0);
   const pickupFee = input.fulfillment === "pickup" ? rates.pickupFeeNgn : 0;
+  const packageCharges = input.packageCharges ?? 0;
   return {
     basePrice: base,
     serviceAdjustment: service - base,
     addonsTotal,
     pickupFee,
-    finalPrice: service + addonsTotal + pickupFee,
+    packageCharges,
+    finalPrice: service + addonsTotal + pickupFee + packageCharges,
   };
 }
 

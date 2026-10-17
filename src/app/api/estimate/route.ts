@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { currencySymbol } from "@/lib/constants";
-import { basePriceNgn, convertNgnTo, getPricingSettings, LocationError, locationDistanceKm } from "@/lib/pricing";
+import { basePriceNgn, convertNgnTo, getPricingSettings, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
 
 const schema = z.object({
   pricingMethod: z.enum(["location", "mileage"]).default("location"),
@@ -12,6 +12,8 @@ const schema = z.object({
   destinationCountry: z.string().optional(),
   fulfillment: z.enum(["dropoff", "pickup"]).default("dropoff"),
   currency: z.string().default("NGN"),
+  packageType: z.string().optional(),
+  pieces: z.coerce.number().int().min(1).default(1),
 });
 
 /** Live quote — same server-side formula used when a shipment is actually saved. */
@@ -44,6 +46,8 @@ export async function POST(request: Request) {
   const rates = await getPricingSettings(input.originCountry);
   let priceNgn = basePriceNgn(rates, input.weightKg, distanceKm);
   if (input.fulfillment === "pickup") priceNgn += rates.pickupFeeNgn;
+  const handlingNgn = packageChargesNgn(rates, [{ packageType: input.packageType, pieces: input.pieces }]);
+  priceNgn += handlingNgn;
   const currency = input.currency.toUpperCase();
 
   return Response.json({
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
     ratePerKmNgn: rates.ratePerKmNgn,
     ratePerKgNgn: rates.ratePerKgNgn,
     fulfillment: input.fulfillment,
+    handlingNgn,
     route,
   });
 }

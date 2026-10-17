@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 import * as z from "zod";
 import { db } from "@/db";
 import { shipmentPackages, shipments } from "@/db/schema";
-import { SHIPMENT_PURPOSES } from "@/lib/constants";
+import { BOX_PRESETS, SHIPMENT_PURPOSES, toKg } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/dal";
-import { calculateFinalPrice, getPricingSettings, haversineKm, LocationError, locationDistanceKm } from "@/lib/pricing";
+import { calculateFinalPrice, getPricingSettings, haversineKm, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
 import { aggregatePackages, canAccessShipment, getShipment, newGuestToken, setGuestCookie } from "@/lib/shipments";
 import { normalizePhone } from "@/lib/phone";
 
@@ -20,6 +20,11 @@ const packageSchema = z.object({
   length: optionalNumber,
   width: optionalNumber,
   height: optionalNumber,
+  packageType: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => (v && BOX_PRESETS.some((b) => b.key === v) ? v : null)),
 });
 
 const pinSchema = z
@@ -33,6 +38,8 @@ const pinSchema = z
 
 const shipmentSchema = z.object({
   id: z.number().int().positive().optional(),
+  // Weights arrive in the unit the customer chose and are stored in kg.
+  weightUnit: z.enum(["kg", "lb"]).default("kg"),
   fulfillment: z.enum(["dropoff", "pickup"]).default("dropoff"),
   shippingDate: z.string().optional(),
   isDocument: z.boolean().default(false),
@@ -96,9 +103,10 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
     }
   }
 
-  const packages = data.packages.map((p) =>
-    data.isDocument ? { ...p, length: null, width: null, height: null } : p,
-  );
+  const packages = data.packages.map((p) => {
+    const kg = { ...p, weight: Math.round(toKg(p.weight, data.weightUnit) * 100) / 100 };
+    return data.isDocument ? { ...kg, length: null, width: null, height: null } : kg;
+  });
   const totals = aggregatePackages(packages);
   const fulfillment = existing?.fulfillment ?? data.fulfillment;
   const rates = await getPricingSettings(data.pickupCountry);
@@ -108,6 +116,7 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
     fulfillment,
     serviceType: existing?.serviceType || undefined,
     addons: existing?.addons ?? [],
+    packageCharges: packageChargesNgn(rates, packages),
   });
 
   const values = {
@@ -138,6 +147,8 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
     notes: data.notes || null,
     distanceKm: Math.round(distanceKm * 10) / 10,
     addonsTotalNgn: price.addonsTotal,
+    packageChargesNgn: price.packageCharges,
+    weightUnit: data.weightUnit,
     priceAmount: price.finalPrice,
     updatedAt: new Date(),
   };

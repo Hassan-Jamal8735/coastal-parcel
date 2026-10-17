@@ -17,7 +17,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
 
   const currency = s.chargeCurrency || "NGN";
   const rates = await getPricingSettings(s.pickupCountry);
-  const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: s.serviceType, addons: s.addons });
+  const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: s.serviceType, addons: s.addons, packageCharges: s.packageChargesNgn });
   const sym = currencySymbol(currency);
   const show = async (ngn: number) => sym + (await convertNgnTo(ngn, currency)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const paystack = paystackReady();
@@ -34,6 +34,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
   }
   for (const key of s.addons) if (rates.addons[key]) rows.push([rates.addons[key].label, await show(rates.addons[key].priceNgn)]);
   if (b.pickupFee > 0) rows.push(["Pickup Fee", await show(b.pickupFee)]);
+  if (b.packageCharges > 0) rows.push(["Package Handling (barrels etc.)", await show(b.packageCharges)]);
 
   return (
     <BookingLayout active="shipments" minimalHeader>

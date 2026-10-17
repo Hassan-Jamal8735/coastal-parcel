@@ -25,6 +25,7 @@ async function reprice(s: Shipment, serviceType: string, addons: string[]) {
     fulfillment: s.fulfillment,
     serviceType,
     addons,
+    packageCharges: s.packageChargesNgn,
   });
 }
 

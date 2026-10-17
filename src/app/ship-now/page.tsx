@@ -1,3 +1,4 @@
+import { getPricingSettings } from "@/lib/pricing";
 import { AppHeader } from "@/components/app-header";
 import { QuoteForm } from "./quote-form";
 
@@ -14,7 +15,7 @@ export default async function ShipNowPage({ searchParams }: { searchParams: Prom
           <p className="shipnow-subtitle">
             Instantly estimate your shipping cost, then continue straight into booking &mdash; no separate forms to fill in twice.
           </p>
-          <QuoteForm prefill={prefill} />
+          <QuoteForm prefill={prefill} packageCharges={(await getPricingSettings()).packageCharges} />
         </div>
       </div>
     </div>

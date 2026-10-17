@@ -102,6 +102,10 @@ export const shipments = pgTable(
     distanceKm: numeric("distance_km", { precision: 10, scale: 2, mode: "number" }),
     addons: jsonb("addons").$type<string[]>().notNull().default([]),
     addonsTotalNgn: numeric("addons_total_ngn", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),
+    // Handling charges for package types (barrels etc.), fixed when the shipment is saved.
+    packageChargesNgn: numeric("package_charges_ngn", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // The unit the customer entered weights in (stored weights are always kg).
+    weightUnit: varchar("weight_unit", { length: 2 }).notNull().default("kg"),
     deliveryEstimate: varchar("delivery_estimate", { length: 50 }),
     currency: varchar("currency", { length: 10 }).notNull().default("NGN"),
     priceAmount: numeric("price_amount", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
@@ -149,6 +153,8 @@ export const shipmentPackages = pgTable(
     length: numeric("length", { precision: 10, scale: 2, mode: "number" }),
     width: numeric("width", { precision: 10, scale: 2, mode: "number" }),
     height: numeric("height", { precision: 10, scale: 2, mode: "number" }),
+    // A BOX_PRESETS key (e.g. "barrel") when the customer picked a package type.
+    packageType: varchar("package_type", { length: 30 }),
     sortOrder: integer("sort_order").notNull().default(0),
   },
   (t) => [index("packages_shipment_idx").on(t.shipmentId)],

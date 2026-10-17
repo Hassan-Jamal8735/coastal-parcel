@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { confirmBooking } from "@/app/actions/booking-steps";
 import { BookingLayout } from "@/components/booking-layout";
-import { serviceLabel } from "@/lib/constants";
+import { serviceLabel, weightBoth } from "@/lib/constants";
 import { getPricingSettings, ngnRates } from "@/lib/pricing";
 import { requireAccessibleShipment } from "@/lib/shipments";
 import { CurrencyPreview } from "./currency-preview";
@@ -51,12 +51,18 @@ export default async function BookingPage({ searchParams }: { searchParams: Prom
 
       <h3 className="ship-section-heading">Package</h3>
       <p>
-        {serviceLabel(s.serviceType)} &middot; {s.packagePieces || 1} pc(s) &middot; {s.packageWeight} kg
+        {serviceLabel(s.serviceType)} &middot; {s.packagePieces || 1} pc(s) &middot; {weightBoth(s.packageWeight)}
         {s.deliveryEstimate ? ` · Delivery in ${s.deliveryEstimate}` : ""}{" "}
         <Link href={`/shipping-options?shipment_id=${s.id}`} className="ship-options-edit-link">
           Edit
         </Link>
       </p>
+
+      {s.packageChargesNgn > 0 && (
+        <p>
+          <strong>Package handling:</strong> &#8358;{fmt(s.packageChargesNgn)} <span className="p-light">(barrels and other package types)</span>
+        </p>
+      )}
 
       {s.addons.length > 0 && (
         <>

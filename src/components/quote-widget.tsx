@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { COUNTRIES } from "@/lib/constants";
+import { COUNTRIES, toKg, type WeightUnit } from "@/lib/constants";
 import { CityAutocomplete } from "./city-autocomplete";
 
 // The widget offers a wider currency list than checkout (estimates only).
@@ -42,6 +42,7 @@ export function QuoteWidget() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [lastRun, setLastRun] = useState<"mileage" | "location" | null>(null);
+  const [unit, setUnit] = useState<WeightUnit>("kg");
 
   // Auto-pick the visitor's currency from their location (falls back to USD).
   useEffect(() => {
@@ -76,17 +77,19 @@ export function QuoteWidget() {
     try {
       if (which === "mileage") {
         const km = parseFloat(mileage.distance);
-        const weight = parseFloat(mileage.weight);
+        const typed = parseFloat(mileage.weight);
+        const weight = toKg(typed, unit);
         if (!(km > 0) || !(weight > 0)) throw new Error("Please enter a distance and parcel weight greater than 0.");
         setResult({ value: "…", meta: "Calculating…", ctaHref: null });
         const d = await request({ pricingMethod: "mileage", weightKg: weight, distanceKm: km }, cur);
         setResult({
           value: formatMoney(d.displayAmount, cur),
-          meta: `${d.distanceKm.toLocaleString("en-US")} km × ${formatMoney(d.ratePerKmNgn, "NGN")}/km + ${weight.toLocaleString("en-US")} kg × ${formatMoney(d.ratePerKgNgn, "NGN")}/kg${cur !== "NGN" ? ` (converted to ${cur})` : ""}`,
-          ctaHref: "/ship?" + new URLSearchParams({ pricing_method: "mileage", distance_km: String(km), package_weight: String(weight) }),
+          meta: `${d.distanceKm.toLocaleString("en-US")} km × ${formatMoney(d.ratePerKmNgn, "NGN")}/km + ${Math.round(weight * 100) / 100} kg × ${formatMoney(d.ratePerKgNgn, "NGN")}/kg${cur !== "NGN" ? ` (converted to ${cur})` : ""}`,
+          ctaHref: "/ship?" + new URLSearchParams({ pricing_method: "mileage", distance_km: String(km), package_weight: String(typed), weight_unit: unit }),
         });
       } else {
-        const weight = parseFloat(loc.weight);
+        const typed = parseFloat(loc.weight);
+        const weight = toKg(typed, unit);
         if (!loc.oCountry || !loc.oCity.trim() || !loc.dCountry || !loc.dCity.trim() || !loc.dPostal.trim() || !(weight > 0)) {
           throw new Error("Please fill in all fields, including a parcel weight greater than 0.");
         }
@@ -97,12 +100,13 @@ export function QuoteWidget() {
         );
         setResult({
           value: formatMoney(d.displayAmount, cur),
-          meta: `${loc.oCity}, ${loc.oCountry} → ${loc.dCity} (${loc.dPostal}), ${loc.dCountry} — ${d.distanceKm.toLocaleString("en-US")} km × ${formatMoney(d.ratePerKmNgn, "NGN")}/km + ${weight.toLocaleString("en-US")} kg × ${formatMoney(d.ratePerKgNgn, "NGN")}/kg${cur !== "NGN" ? ` (converted to ${cur})` : ""}`,
+          meta: `${loc.oCity}, ${loc.oCountry} → ${loc.dCity} (${loc.dPostal}), ${loc.dCountry} — ${d.distanceKm.toLocaleString("en-US")} km × ${formatMoney(d.ratePerKmNgn, "NGN")}/km + ${Math.round(weight * 100) / 100} kg × ${formatMoney(d.ratePerKgNgn, "NGN")}/kg${cur !== "NGN" ? ` (converted to ${cur})` : ""}`,
           ctaHref:
             "/ship?" +
             new URLSearchParams({
               pricing_method: "location",
-              package_weight: String(weight),
+              package_weight: String(typed),
+              weight_unit: unit,
               pickup_city: loc.oCity.trim(),
               pickup_country: loc.oCountry,
               pickup_postal_code: loc.oPostal.trim(),
@@ -172,7 +176,10 @@ export function QuoteWidget() {
         <label htmlFor="lpq-weight-mileage">Parcel weight</label>
         <div className="lpq-input-row lpq-distance-row">
           <input type="number" id="lpq-weight-mileage" min="0" step="0.1" placeholder="e.g. 5" value={mileage.weight} onChange={(e) => setMileage({ ...mileage, weight: e.target.value })} />
-          <span className="lpq-unit">kg</span>
+          <select className="lpq-unit lpq-unit-select" aria-label="Weight unit" value={unit} onChange={(e) => setUnit(e.target.value as WeightUnit)}>
+            <option value="kg">kg</option>
+            <option value="lb">lb</option>
+          </select>
         </div>
       </div>
 
@@ -220,7 +227,10 @@ export function QuoteWidget() {
         <div className="lpq-input-row lpq-distance-row">
           <label htmlFor="lpq-weight-location">Parcel weight</label>
           <input type="number" id="lpq-weight-location" min="0" step="0.1" placeholder="e.g. 5" value={loc.weight} onChange={(e) => setLoc({ ...loc, weight: e.target.value })} />
-          <span className="lpq-unit">kg</span>
+          <select className="lpq-unit lpq-unit-select" aria-label="Weight unit" value={unit} onChange={(e) => setUnit(e.target.value as WeightUnit)}>
+            <option value="kg">kg</option>
+            <option value="lb">lb</option>
+          </select>
         </div>
       </div>
 

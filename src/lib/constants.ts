@@ -83,12 +83,29 @@ export const CURRENCIES: Record<string, { name: string; symbol: string }> = {
 export const currencySymbol = (c: string) => CURRENCIES[c.toUpperCase()]?.symbol ?? c.toUpperCase() + " ";
 
 /** "Not sure about the size?" presets on the package step. */
-export const BOX_PRESETS = [
+/**
+ * Package types offered on the quote and shipment forms. `weight` is a
+ * typical weight in kg to start from (null = leave the weight as typed —
+ * barrel contents vary too much to guess). Each type can carry its own
+ * handling charge, set in Back Office → Pricing.
+ */
+export const BOX_PRESETS: { key: string; label: string; l: number; w: number; h: number; weight: number | null }[] = [
   { key: "envelope", label: "Envelope", l: 30, w: 22, h: 2, weight: 0.5 },
   { key: "small", label: "Small Box", l: 35, w: 25, h: 15, weight: 3 },
   { key: "medium", label: "Medium Box", l: 45, w: 35, h: 25, weight: 7 },
   { key: "large", label: "Large Box", l: 60, w: 45, h: 35, weight: 15 },
+  { key: "half_barrel", label: "Half Barrel (30 gal)", l: 47, w: 47, h: 75, weight: null },
+  { key: "barrel", label: "Barrel (55 gal)", l: 58, w: 58, h: 88, weight: null },
 ];
+export const packageTypeLabel = (key: string | null | undefined) => BOX_PRESETS.find((b) => b.key === key)?.label ?? null;
+
+/* ---- Weight units: everything is stored and priced in kg; lb is for entry and display. ---- */
+export type WeightUnit = "kg" | "lb";
+export const LB_PER_KG = 2.20462;
+export const toKg = (value: number, unit: WeightUnit) => (unit === "lb" ? value / LB_PER_KG : value);
+export const fromKg = (kg: number, unit: WeightUnit) => (unit === "lb" ? kg * LB_PER_KG : kg);
+/** "7 kg (15.4 lb)" — for labels, receipts and summaries. */
+export const weightBoth = (kg: number) => `${Math.round(kg * 100) / 100} kg (${Math.round(kg * LB_PER_KG * 10) / 10} lb)`;
 
 export function formatMoney(amount: number, currency = "NGN") {
   // Whole amounts stay whole (₦4,637,715); anything with cents shows both digits ($243.50).

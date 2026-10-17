@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { BookingLayout, ShipnowStepper } from "@/components/booking-layout";
+import { BOX_PRESETS, fromKg } from "@/lib/constants";
 import { getCurrentUser, homeFor } from "@/lib/dal";
+import { getPricingSettings } from "@/lib/pricing";
 import { canAccessShipment, getPackages, getShipment } from "@/lib/shipments";
 import { ShipForm, type ShipFormInitial } from "./ship-form";
 
@@ -40,9 +42,12 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       deliveryCountry: s.deliveryCountry,
       pickupPin: s.pickupLat != null && s.pickupLng != null ? { lat: s.pickupLat, lng: s.pickupLng } : null,
       deliveryPin: s.deliveryLat != null && s.deliveryLng != null ? { lat: s.deliveryLat, lng: s.deliveryLng } : null,
+      weightUnit: s.weightUnit === "lb" ? "lb" : "kg",
       packages: pkgs.map((p) => ({
         description: p.description ?? "",
-        weight: String(p.weight),
+        // Stored in kg; shown in the unit the customer used.
+        weight: String(Math.round(fromKg(p.weight, s.weightUnit === "lb" ? "lb" : "kg") * 100) / 100),
+        packageType: p.packageType ?? "",
         pieces: String(p.pieces),
         length: p.length?.toString() ?? "",
         width: p.width?.toString() ?? "",
@@ -75,9 +80,11 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       deliveryCountry: q.delivery_country ?? "",
       pickupPin: null,
       deliveryPin: null,
+      weightUnit: q.weight_unit === "lb" ? "lb" : "kg",
       packages: [
         {
           description: "",
+          packageType: BOX_PRESETS.some((b) => b.key === q.package_type) ? q.package_type! : "",
           weight: q.package_weight ?? "",
           pieces: q.package_pieces || "1",
           length: q.package_length ?? "",
@@ -105,7 +112,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       {!user && (
         <div className="auth-notice">You don&apos;t need an account to fill this in &mdash; check out as a guest, and create an account after paying if you&apos;d like to track it from a dashboard.</div>
       )}
-      <ShipForm initial={initial} isGuest={!user} />
+      <ShipForm initial={initial} isGuest={!user} packageCharges={(await getPricingSettings()).packageCharges} />
     </BookingLayout>
   );
 }

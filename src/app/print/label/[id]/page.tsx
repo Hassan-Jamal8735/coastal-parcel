@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- static logo, printed as-is */
 import { notFound } from "next/navigation";
 import { PrintToolbar } from "@/components/print-toolbar";
-import { serviceLabel, SITE_TIMEZONE } from "@/lib/constants";
+import { packageTypeLabel, serviceLabel, SITE_TIMEZONE, weightBoth } from "@/lib/constants";
 import { siteUrl } from "@/lib/env";
 import { barcodeSvg, canPrintShipment, qrSvg } from "@/lib/print";
 import { getPackages, getShipment } from "@/lib/shipments";
@@ -17,7 +17,9 @@ export default async function LabelPage({ params }: { params: Promise<{ id: stri
   const tracking = s.trackingNumber!;
   const packages = await getPackages(s.id);
   // One label per physical parcel: a package row with 3 pieces prints 3 labels.
-  const parcels = packages.flatMap((p) => Array.from({ length: Math.max(1, p.pieces) }, () => ({ weight: p.weight, description: p.description })));
+  const parcels = packages.flatMap((p) =>
+    Array.from({ length: Math.max(1, p.pieces) }, () => ({ weight: p.weight, description: packageTypeLabel(p.packageType) ?? p.description })),
+  );
   if (!parcels.length) parcels.push({ weight: s.packageWeight, description: null });
   const total = parcels.length;
 
@@ -72,7 +74,7 @@ export default async function LabelPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <div className="label-facts">
-              <div><span>Weight</span><strong>{parcel.weight} kg</strong></div>
+              <div><span>Weight</span><strong>{weightBoth(parcel.weight)}</strong></div>
               <div><span>Contents</span><strong>{s.isDocument ? "Document" : parcel.description || "Package"}</strong></div>
               <div><span>Ship date</span><strong>{shipDate}</strong></div>
             </div>

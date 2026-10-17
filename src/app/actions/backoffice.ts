@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import * as z from "zod";
 import { db } from "@/db";
 import { contactMessages, settings, shipments, trackingEvents, users } from "@/db/schema";
-import { COUNTRIES, SHIPMENT_STATUS_LABELS } from "@/lib/constants";
+import { BOX_PRESETS, COUNTRIES, SHIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { notifyCustomerStatusChange, notifyDriverAssigned, sendDriverDecision, sendStaffAccountCreated } from "@/lib/email";
 import { DEFAULT_PRICING } from "@/lib/pricing";
@@ -102,6 +102,19 @@ async function writePricing(change: (value: Record<string, unknown>) => Record<s
     .insert(settings)
     .values({ key: "pricing", value })
     .onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date() } });
+}
+
+/** Fixed handling charge per piece for each package type (e.g. a barrel), in NGN. */
+export async function boSavePackageCharges(formData: FormData) {
+  await requireStaff();
+  const charges: Record<string, number> = {};
+  for (const b of BOX_PRESETS) {
+    const n = Number(formData.get(`charge_${b.key}`) || 0);
+    if (!Number.isFinite(n) || n < 0) redirect("/backoffice?panel=pricing&error=rates#packages");
+    if (n > 0) charges[b.key] = n;
+  }
+  await writePricing((v) => ({ ...v, packageCharges: charges }));
+  redirect("/backoffice?panel=pricing&saved=1#packages");
 }
 
 /** Adds or updates one country's own rates (used for shipments sent FROM that country). */

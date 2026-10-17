@@ -31,7 +31,7 @@ export default async function ShippingOptionsPage({ searchParams }: { searchPara
       <form action={selectService.bind(null, s.id)}>
         <div className="shipnow-service-options">
           {Object.entries(SERVICE_TYPES).map(([key, label]) => {
-            const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: key });
+            const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: key, packageCharges: s.packageChargesNgn });
             return (
               <label key={key} className="shipnow-service-option">
                 <input type="radio" name="service_type" value={key} defaultChecked={key === (s.serviceType || "door_to_door")} />

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PrintToolbar } from "@/components/print-toolbar";
 import { db } from "@/db";
 import { trackingEvents, users } from "@/db/schema";
-import { formatMoney, serviceLabel, SHIPMENT_PURPOSES, SITE_TIMEZONE } from "@/lib/constants";
+import { formatMoney, packageTypeLabel, serviceLabel, SHIPMENT_PURPOSES, SITE_TIMEZONE, weightBoth } from "@/lib/constants";
 import { barcodeSvg, canPrintShipment } from "@/lib/print";
 import { getPricingSettings } from "@/lib/pricing";
 import { getPackages, getShipment } from "@/lib/shipments";
@@ -31,7 +31,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   // The shipment stores its final price and add-on total; list each add-on by name.
   const addons = s.addons.map((key) => ({ label: rates.addons[key]?.label ?? key, price: rates.addons[key]?.priceNgn ?? 0 }));
   const addonsMatch = addons.reduce((n, a) => n + a.price, 0) === s.addonsTotalNgn;
-  const shippingCharge = s.priceAmount - s.addonsTotalNgn;
+  const shippingCharge = s.priceAmount - s.addonsTotalNgn - s.packageChargesNgn;
   const chargedOther = s.chargeCurrency && s.chargeCurrency !== "NGN" && s.chargeAmount != null;
   const receiptNo = `CP-R-${String(s.id).padStart(6, "0")}`;
   const billedTo = customer ?? { name: s.senderName, email: s.senderEmail ?? "" };
@@ -97,19 +97,29 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
               <td>
                 <strong>{serviceLabel(s.serviceType ?? "") || "Shipping"}</strong> shipping{s.fulfillment === "pickup" ? ", including pickup" : ""}
                 <div className="receipt-sub">
-                  {s.isDocument ? "Document" : "Package"} · {s.packageWeight} kg
+                  {s.isDocument ? "Document" : "Package"} · {weightBoth(s.packageWeight)}
                   {s.distanceKm ? ` · ${Math.round(s.distanceKm).toLocaleString("en-US")} km` : ""}
                   {s.shipmentPurpose ? ` · ${SHIPMENT_PURPOSES[s.shipmentPurpose as keyof typeof SHIPMENT_PURPOSES] ?? s.shipmentPurpose}` : ""}
                 </div>
                 {packages.length > 1 && (
                   <div className="receipt-sub">
-                    {packages.map((p) => `${p.pieces} × ${p.weight} kg${p.description ? ` (${p.description})` : ""}`).join(" · ")}
+                    {packages.map((p) => `${p.pieces} × ${weightBoth(p.weight)}${p.description ? ` (${p.description})` : ""}`).join(" · ")}
                   </div>
                 )}
               </td>
               <td>{s.packagePieces}</td>
               <td className="num">{naira(shippingCharge)}</td>
             </tr>
+            {s.packageChargesNgn > 0 &&
+              packages
+                .filter((p) => p.packageType && rates.packageCharges[p.packageType])
+                .map((p) => (
+                  <tr key={`pkg-${p.id}`}>
+                    <td>{packageTypeLabel(p.packageType)} handling</td>
+                    <td>{p.pieces}</td>
+                    <td className="num">{naira(rates.packageCharges[p.packageType!] * p.pieces)}</td>
+                  </tr>
+                ))}
             {addonsMatch
               ? addons.map((a) => (
                   <tr key={a.label}>
