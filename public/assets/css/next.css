@@ -1769,14 +1769,56 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
-.lpq-unit-select {
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
+/* Home quote box: kg | lb switch sitting inside the weight field, like the "km" label. */
+#lpq-widget .lpq-unit-field {
+  position: relative;
+  width: 100%;
+}
+#lpq-widget .lpq-unit-field input[type="number"] {
+  padding-right: 96px;
+}
+#lpq-widget .lpq-unit-switch {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  background: #fff;
+}
+#lpq-widget .lpq-unit-switch button {
+  padding: 4px 11px;
+  font-size: 12.5px;
+}
+/* Phones: one column so city/postal fields aren't squeezed. */
+@media (max-width: 520px) {
+  #lpq-widget .lpq-row-2col {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 /* Weight shown in two units on the label */
 .label-facts {
   grid-template-columns: 1.35fr 1.3fr 1fr;
+}
+/* Home quote box header whenever its column is narrow (phones up to small laptops): title first, currency below. */
+@media (max-width: 1199px) {
+  #lpq-widget {
+    padding: 22px 18px;
+  }
+  #lpq-widget .lpq-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #lpq-widget .lpq-currency-wrap {
+    align-items: stretch;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  #lpq-widget select.lpq-currency-select {
+    width: 100%;
+  }
+  #lpq-widget .lpq-cur-note {
+    text-align: left;
+    max-width: none;
+  }
 }

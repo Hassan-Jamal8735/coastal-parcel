@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { COUNTRIES, toKg, type WeightUnit } from "@/lib/constants";
 import { CityAutocomplete } from "./city-autocomplete";
+import { WeightUnitToggle } from "./weight-unit";
 
 // The widget offers a wider currency list than checkout (estimates only).
 const WIDGET_CURRENCIES: [string, string][] = [
@@ -175,11 +176,10 @@ export function QuoteWidget() {
         </div>
         <label htmlFor="lpq-weight-mileage">Parcel weight</label>
         <div className="lpq-input-row lpq-distance-row">
-          <input type="number" id="lpq-weight-mileage" min="0" step="0.1" placeholder="e.g. 5" value={mileage.weight} onChange={(e) => setMileage({ ...mileage, weight: e.target.value })} />
-          <select className="lpq-unit lpq-unit-select" aria-label="Weight unit" value={unit} onChange={(e) => setUnit(e.target.value as WeightUnit)}>
-            <option value="kg">kg</option>
-            <option value="lb">lb</option>
-          </select>
+          <div className="lpq-unit-field">
+            <input type="number" id="lpq-weight-mileage" min="0" step="0.1" placeholder="e.g. 5" value={mileage.weight} onChange={(e) => setMileage({ ...mileage, weight: e.target.value })} />
+            <WeightUnitToggle value={unit} onChange={setUnit} className="lpq-unit-switch" />
+          </div>
         </div>
       </div>
 
@@ -226,11 +226,10 @@ export function QuoteWidget() {
 
         <div className="lpq-input-row lpq-distance-row">
           <label htmlFor="lpq-weight-location">Parcel weight</label>
-          <input type="number" id="lpq-weight-location" min="0" step="0.1" placeholder="e.g. 5" value={loc.weight} onChange={(e) => setLoc({ ...loc, weight: e.target.value })} />
-          <select className="lpq-unit lpq-unit-select" aria-label="Weight unit" value={unit} onChange={(e) => setUnit(e.target.value as WeightUnit)}>
-            <option value="kg">kg</option>
-            <option value="lb">lb</option>
-          </select>
+          <div className="lpq-unit-field">
+            <input type="number" id="lpq-weight-location" min="0" step="0.1" placeholder="e.g. 5" value={loc.weight} onChange={(e) => setLoc({ ...loc, weight: e.target.value })} />
+            <WeightUnitToggle value={unit} onChange={setUnit} className="lpq-unit-switch" />
+          </div>
         </div>
       </div>
 
