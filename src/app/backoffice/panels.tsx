@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
-import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boSavePackageCharges, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
+import { boCreateStaff, boMarkMessageRead, boRemoveCountryRates, boRemoveFixedRoute, boSaveFixedRoute, boSavePackageCharges, boRemoveStaff, boSaveCountryRates, boSavePricing, boSaveShipment, boSetDriverStatus } from "@/app/actions/backoffice";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { FleetMap, type FleetDriver } from "@/components/fleet-map";
 import { TrackingMap, type MapPoint } from "@/components/tracking-map";
@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { contactMessages, shipments, users } from "@/db/schema";
 import { ACTIVE_DELIVERY_STATUSES, BOX_PRESETS, COUNTRIES, packageTypeLabel, weightBoth, formatMoney, SERVICE_TYPES, SHIPMENT_PURPOSES, SHIPMENT_STATUS_LABELS, serviceLabel, SITE_TIMEZONE, statusLabel } from "@/lib/constants";
 import { PRINTABLE_STATUSES } from "@/lib/print-statuses";
-import { getCountryRates, getPricingSettings, type CountryRates } from "@/lib/pricing";
+import { getCountryRates, getPricingSettings, type CountryRates, type FixedRoute } from "@/lib/pricing";
 import { getPackages } from "@/lib/shipments";
 import { formatDateTime, getLiveDriverLocation, getTrackingEvents, timeAgo } from "@/lib/tracking";
 
@@ -250,6 +250,14 @@ async function ShipmentDetail({ id, saved }: { id: number; saved: boolean }) {
                   .join("; ") || "—"}
               </Fact>
               {s.packageChargesNgn > 0 && <Fact label="Package handling">{naira(s.packageChargesNgn)}</Fact>}
+              {s.fixedPrice && (
+                <Fact label="Fixed price">
+                  {s.fixedPrice.label} &times; {s.fixedPrice.pieces} &middot; {formatMoney(s.fixedPrice.freightUsd, "USD")}
+                </Fact>
+              )}
+              <Fact label="Pickup / delivery">
+                {s.fulfillment === "pickup" ? "Home pickup" : "Drop-off"} &middot; {s.homeDelivery ? "Home delivery" : "Standard delivery"}
+              </Fact>
               <Fact label="Purpose">{purpose || "—"}</Fact>
               <Fact label="Reference">{s.shipmentReference || "—"}</Fact>
               <Fact label="Price">
@@ -529,8 +537,26 @@ export async function DriversPanel({ saved }: { saved: boolean }) {
 
 const PRICING_ERRORS: Record<string, string> = {
   country: "Please choose a country.",
+  route: "Please choose a package type and both countries.",
+  usd: "Please enter the price, pickup fee and delivery fee as numbers of 0 or more.",
   rates: "Please enter all three rates as numbers of 0 or more.",
 };
+
+function FixedRouteFields({ route }: { route?: FixedRoute }) {
+  const usd = (name: "priceUsd" | "pickupUsd" | "deliveryUsd", label: string) => (
+    <div className="dashboard-form-field">
+      <label>{label} (USD)</label>
+      <input type="number" step="0.01" min="0" name={name} defaultValue={route?.[name]} required />
+    </div>
+  );
+  return (
+    <div className="pr-fields">
+      {usd("priceUsd", "Price per piece")}
+      {usd("pickupUsd", "Home pickup")}
+      {usd("deliveryUsd", "Home delivery")}
+    </div>
+  );
+}
 
 function RateFields({ prefix, rates }: { prefix: string; rates?: CountryRates }) {
   return (
@@ -578,7 +604,8 @@ export async function PricingPanel({ saved, error }: { saved: boolean; error?: s
       <div className="bo-card" id="packages">
         <h3>Package type charges</h3>
         <p className="sd-muted">
-          A fixed handling charge added for each piece of that type, on top of the distance and weight price (e.g. barrels). Leave 0 for no extra charge.
+          A fixed handling charge added for each piece of that type, on top of the distance and weight price (e.g. barrels). Leave 0 for no extra charge. Not added on
+          routes with a fixed route price below.
         </p>
         <form action={boSavePackageCharges}>
           <div className="pr-fields">
@@ -590,6 +617,86 @@ export async function PricingPanel({ saved, error }: { saved: boolean; error?: s
             ))}
           </div>
           <input type="submit" className="main-button w-button" value="Save package charges" />
+        </form>
+      </div>
+
+      <div className="bo-card" id="fixed">
+        <h3>Fixed route prices</h3>
+        <p className="sd-muted">
+          A flat price per piece for one package type between two countries, in place of the distance and weight price and any package charge. Home pickup and home
+          delivery are optional extras the customer can add, charged once per shipment.
+        </p>
+        {rates.fixedRoutes.length === 0 ? (
+          <p className="sd-muted">No fixed route prices yet.</p>
+        ) : (
+          <div className="pr-list">
+            {rates.fixedRoutes.map((r) => (
+              <details key={`${r.packageType}-${r.from}-${r.to}`} className="pr-row">
+                <summary>
+                  <span className="pr-country">
+                    {packageTypeLabel(r.packageType)}: {r.from} &rarr; {r.to}
+                  </span>
+                  <span className="pr-sum">
+                    {formatMoney(r.priceUsd, "USD")} each &middot; pickup {formatMoney(r.pickupUsd, "USD")} &middot; delivery {formatMoney(r.deliveryUsd, "USD")}
+                  </span>
+                  <span className="pr-edit">Edit</span>
+                </summary>
+                <form action={boSaveFixedRoute} className="pr-form">
+                  <input type="hidden" name="packageType" value={r.packageType} />
+                  <input type="hidden" name="from" value={r.from} />
+                  <input type="hidden" name="to" value={r.to} />
+                  <FixedRouteFields route={r} />
+                  <div className="pr-actions">
+                    <input type="submit" className="main-button w-button" value="Save" />
+                    <button type="submit" formAction={boRemoveFixedRoute} formNoValidate className="dv-failed">
+                      Remove
+                    </button>
+                  </div>
+                </form>
+              </details>
+            ))}
+          </div>
+        )}
+
+        <h4 className="pr-add-title">Add a fixed route price</h4>
+        <form action={boSaveFixedRoute}>
+          <div className="pr-fields">
+            <div className="dashboard-form-field">
+              <label htmlFor="fixed-type">Package type</label>
+              <select id="fixed-type" name="packageType" defaultValue="" required>
+                <option value="" disabled>
+                  Select package type
+                </option>
+                {BOX_PRESETS.map((b) => (
+                  <option key={b.key} value={b.key}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(
+              [
+                ["from", "Ships from"],
+                ["to", "Ships to"],
+              ] as const
+            ).map(([name, label]) => (
+              <div key={name} className="dashboard-form-field">
+                <label htmlFor={`fixed-${name}`}>{label}</label>
+                <select id={`fixed-${name}`} name={name} defaultValue="" required>
+                  <option value="" disabled>
+                    Select country
+                  </option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <FixedRouteFields />
+          <input type="submit" className="main-button w-button" value="Add fixed price" />
         </form>
       </div>
 

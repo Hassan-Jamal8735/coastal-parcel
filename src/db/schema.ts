@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { FixedPrice } from "@/lib/pricing";
 import {
   bigserial,
   bigint,
@@ -104,6 +105,10 @@ export const shipments = pgTable(
     addonsTotalNgn: numeric("addons_total_ngn", { precision: 10, scale: 2, mode: "number" }).notNull().default(0),
     // Handling charges for package types (barrels etc.), fixed when the shipment is saved.
     packageChargesNgn: numeric("package_charges_ngn", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // Fixed-route pieces (e.g. barrels US → Nigeria) and their USD prices, set when the shipment is saved.
+    fixedPrice: jsonb("fixed_price").$type<FixedPrice>(),
+    // Home delivery to the receiver's address — a paid option on fixed-price routes.
+    homeDelivery: boolean("home_delivery").notNull().default(false),
     // The unit the customer entered weights in (stored weights are always kg).
     weightUnit: varchar("weight_unit", { length: 2 }).notNull().default("kg"),
     deliveryEstimate: varchar("delivery_estimate", { length: 50 }),

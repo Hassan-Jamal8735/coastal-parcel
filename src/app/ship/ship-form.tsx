@@ -8,7 +8,8 @@ import { CityAutocomplete } from "@/components/city-autocomplete";
 import { LocationPinPicker } from "@/components/location-pin-picker";
 import { useDraft } from "@/lib/use-draft";
 import { WeightUnitToggle } from "@/components/weight-unit";
-import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES, fromKg, LB_PER_KG, toKg, type WeightUnit } from "@/lib/constants";
+import { COUNTRIES, CURRENCIES, PROHIBITED_ITEMS, SHIPMENT_PURPOSES, formatMoney, fromKg, LB_PER_KG, toKg, type WeightUnit } from "@/lib/constants";
+import type { FixedRoute } from "@/lib/pricing";
 import { PhoneInput } from "@/components/phone-input";
 
 type PackageRow = { description: string; packageType: string; weight: string; pieces: string; length: string; width: string; height: string };
@@ -18,6 +19,7 @@ export type Pin = { lat: number; lng: number };
 export type ShipFormInitial = {
   id?: number;
   fulfillment: "dropoff" | "pickup";
+  homeDelivery: boolean;
   shippingDate: string;
   isDocument: boolean;
   senderName: string;
@@ -46,7 +48,17 @@ export type ShipFormInitial = {
 
 const blankPackage: PackageRow = { description: "", packageType: "", weight: "", pieces: "1", length: "", width: "", height: "" };
 
-export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFormInitial; isGuest: boolean; packageCharges: Record<string, number> }) {
+export function ShipForm({
+  initial,
+  isGuest,
+  packageCharges,
+  fixedRoutes,
+}: {
+  initial: ShipFormInitial;
+  isGuest: boolean;
+  packageCharges: Record<string, number>;
+  fixedRoutes: FixedRoute[];
+}) {
   // Kept across a page refresh (cleared once submitted).
   const [f, setF, clearDraft] = useDraft(`cp-ship-draft:${initial.id ?? "new"}`, initial);
   const [error, setError] = useState("");
@@ -64,11 +76,19 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
   const totalPieces = f.packages.reduce((s, p) => s + (parseInt(p.pieces) || 0), 0);
   const unit = f.weightUnit;
   const totalKg = toKg(totalWeight, unit);
-  const handling = f.packages.reduce((s, p) => s + (p.packageType ? (packageCharges[p.packageType] ?? 0) * (parseInt(p.pieces) || 0) : 0), 0);
+  // Package types with a fixed price on this route (e.g. barrels US → Nigeria) replace the normal price and handling charge.
+  const routeFor = (type: string) => fixedRoutes.find((r) => r.packageType === type && r.from === f.pickupCountry && r.to === f.deliveryCountry);
+  const fixedRows = f.packages.flatMap((p) => {
+    const r = p.packageType ? routeFor(p.packageType) : undefined;
+    return r ? [{ route: r, pieces: parseInt(p.pieces) || 0 }] : [];
+  });
+  const fixedUsd = fixedRows.reduce((s, x) => s + x.route.priceUsd * x.pieces, 0);
+  const pickupUsd = Math.max(0, ...fixedRows.map((x) => x.route.pickupUsd));
+  const deliveryUsd = Math.max(0, ...fixedRows.map((x) => x.route.deliveryUsd));
+  const handling = f.packages.reduce((s, p) => s + (p.packageType && !routeFor(p.packageType) ? (packageCharges[p.packageType] ?? 0) * (parseInt(p.pieces) || 0) : 0), 0);
 
   /** A postal code typed before the city fills the city in (country must be chosen). */
-  async function fillCityFromPostal(where: "pickup" | "delivery", code: string) {
-    const country = f[`${where}Country`];
+  async function fillCityFromPostal(where: "pickup" | "delivery", code: string, country = f[`${where}Country`]) {
     if (!code.trim() || !country || f[`${where}City`].trim()) return;
     const res = await fetch(`/api/postal?code=${encodeURIComponent(code.trim())}&country=${encodeURIComponent(country)}`).catch(() => null);
     const data = res?.ok ? await res.json() : null;
@@ -105,6 +125,8 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
           destinationCity: f.deliveryCity,
           destinationCountry: f.deliveryCountry,
           fulfillment: f.fulfillment,
+          homeDelivery: f.homeDelivery,
+          packages: f.packages.map((p) => ({ packageType: p.packageType || null, pieces: parseInt(p.pieces) || 1, weightKg: toKg(parseFloat(p.weight) || 0, unit) })),
           currency: cur,
         }),
       }).then((r) => r.json());
@@ -114,7 +136,9 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
       } else {
         setEstimate({
           value: res.currencySymbol + Number(res.displayAmount).toLocaleString("en-US", { maximumFractionDigits: 2 }),
-          meta: `${res.route} — ${res.distanceKm} km × ₦${res.ratePerKmNgn}/km + weight × ₦${res.ratePerKgNgn}/kg${res.currency !== "NGN" ? ` (converted to ${res.currency})` : ""}`,
+          meta: res.fixed
+            ? `${res.route} — ${res.fixed.label} × ${res.fixed.pieces} at a fixed ${formatMoney(res.fixed.freightUsd, "USD")}${f.fulfillment === "pickup" ? " + home pickup" : ""}${f.homeDelivery ? " + home delivery" : ""}`
+            : `${res.route} — ${res.distanceKm} km × ₦${res.ratePerKmNgn}/km + weight × ₦${res.ratePerKgNgn}/kg${res.currency !== "NGN" ? ` (converted to ${res.currency})` : ""}`,
         });
       }
     } catch {
@@ -129,7 +153,7 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
     setError("");
     startTransition(async () => {
       clearDraft();
-      const result = await saveShipment({ ...f, distanceKm: f.distanceKm || undefined });
+      const result = await saveShipment({ ...f, homeDelivery: fixedRows.length > 0 && f.homeDelivery, distanceKm: f.distanceKm || undefined });
       // saveShipment redirects on success; it only returns when something's wrong.
       if (result?.error) {
         setError(result.error);
@@ -195,7 +219,11 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
               className="field w-select"
               required
               value={f[k("Country")]}
-              onChange={(e) => setF((prev) => ({ ...prev, [k("Country")]: e.target.value, [k("City")]: "", [k("PostalCode")]: "" }))}
+              onChange={(e) => {
+                // Keep what was already typed: the form asks for the address before the country.
+                set(k("Country"), e.target.value);
+                fillCityFromPostal(where, f[k("PostalCode")], e.target.value);
+              }}
             >
               <option value="" disabled>
                 Select country
@@ -365,8 +393,36 @@ export function ShipForm({ initial, isGuest, packageCharges }: { initial: ShipFo
                 &middot; Package handling: <strong>&#8358;{handling.toLocaleString("en-US")}</strong>
               </>
             )}
+            {fixedUsd > 0 && (
+              <>
+                {" "}
+                &middot; Fixed price: <strong>{formatMoney(fixedUsd, "USD")}</strong>
+              </>
+            )}
           </div>
         </ShipCardSection>
+
+        {fixedRows.length > 0 && (
+          <ShipCardSection icon="route" title="Pickup & Delivery">
+            <p className="p-light" style={{ margin: "0 0 12px" }}>
+              {fixedRows.map((x) => x.route.packageType).includes("barrel") ? "Barrels" : "These packages"} ship from {f.pickupCountry} to {f.deliveryCountry} at a fixed
+              price. Add home pickup or home delivery if you need them.
+            </p>
+            {(
+              [
+                ["Home pickup from the sender's address", pickupUsd, f.fulfillment === "pickup", (on: boolean) => set("fulfillment", on ? "pickup" : "dropoff")],
+                ["Home delivery to the receiver's address", deliveryUsd, f.homeDelivery, (on: boolean) => set("homeDelivery", on)],
+              ] as const
+            ).map(([label, usd, checked, onToggle]) => (
+              <label key={label} className="shipnow-checkbox-row">
+                <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
+                <span>
+                  {label} &mdash; <strong>+{formatMoney(usd, "USD")}</strong>
+                </span>
+              </label>
+            ))}
+          </ShipCardSection>
+        )}
 
         <ShipCardSection icon="tag" title="Purpose & Reference">
           <div className="form-row-2col">

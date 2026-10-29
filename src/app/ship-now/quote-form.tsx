@@ -4,11 +4,19 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoxPresets } from "@/components/box-presets";
 import { CityAutocomplete } from "@/components/city-autocomplete";
-import { COUNTRIES, fromKg, toKg, type WeightUnit } from "@/lib/constants";
+import { COUNTRIES, formatMoney, fromKg, toKg, type WeightUnit } from "@/lib/constants";
 import { useDraft } from "@/lib/use-draft";
 import { WeightUnitToggle } from "@/components/weight-unit";
 
-type Quote = { displayAmount: number; currencySymbol: string; distanceKm: number; route: string; handlingNgn?: number; error?: string };
+type Quote = {
+  displayAmount: number;
+  currencySymbol: string;
+  distanceKm: number;
+  route: string;
+  handlingNgn?: number;
+  fixed?: { label: string; pieces: number; freightUsd: number; pickupUsd: number; deliveryUsd: number } | null;
+  error?: string;
+};
 type Loc = { country: string; city: string; postal: string };
 
 function LocationBlock({ label, loc, setLoc, placeholder }: { label: string; loc: Loc; setLoc: React.Dispatch<React.SetStateAction<Loc>>; placeholder: string }) {
@@ -285,7 +293,11 @@ export function QuoteForm({ prefill, packageCharges }: { prefill: Record<string,
               </div>
               <p className="shipnow-quote-meta">
                 {quotes[key].route} — {quotes[key].distanceKm} km · {eta}
-                {extra}
+                {quotes[key].fixed
+                  ? ` · ${quotes[key].fixed!.label} × ${quotes[key].fixed!.pieces} at a fixed ${formatMoney(quotes[key].fixed!.freightUsd, "USD")}` +
+                    (key === "pickup" ? ` · includes ${formatMoney(quotes[key].fixed!.pickupUsd, "USD")} home pickup` : "") +
+                    ` · home delivery available for ${formatMoney(quotes[key].fixed!.deliveryUsd, "USD")}`
+                  : extra}
                 {quotes[key].handlingNgn ? ` · includes ₦${quotes[key].handlingNgn!.toLocaleString("en-US")} package handling` : ""}
               </p>
               <Link href={shipUrl(key)} className="shipnow-btn shipnow-btn-solid">

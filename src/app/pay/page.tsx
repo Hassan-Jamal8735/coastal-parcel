@@ -17,7 +17,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
 
   const currency = s.chargeCurrency || "NGN";
   const rates = await getPricingSettings(s.pickupCountry);
-  const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: s.serviceType, addons: s.addons, packageCharges: s.packageChargesNgn });
+  const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: s.serviceType, addons: s.addons, packageCharges: s.packageChargesNgn, fixed: s.fixedPrice, homeDelivery: s.homeDelivery });
   const sym = currencySymbol(currency);
   const show = async (ngn: number) => sym + (await convertNgnTo(ngn, currency)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const paystack = paystackReady();
@@ -28,12 +28,16 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
   const paystackNote = paystack ? chargeNote(paystackCharge(s)) : null;
   const stripeNote = stripe ? chargeNote(await stripeCharge(s)) : null;
 
-  const rows: [string, string][] = [["Transportation Charges", await show(b.basePrice)]];
+  const rows: [string, string][] = [];
+  // A shipment of only fixed-price pieces (e.g. barrels to Nigeria) has no distance/weight charge to list.
+  if (!s.fixedPrice || b.basePrice > 0) rows.push(["Transportation Charges", await show(b.basePrice)]);
+  if (s.fixedPrice) rows.push([`${s.fixedPrice.label} × ${s.fixedPrice.pieces} (fixed price)`, await show(b.fixedFreight)]);
   if (Math.abs(b.serviceAdjustment) > 0.01) {
     rows.push([`${serviceLabel(s.serviceType)} Service Adjustment`, (b.serviceAdjustment < 0 ? "−" : "") + (await show(Math.abs(b.serviceAdjustment)))]);
   }
   for (const key of s.addons) if (rates.addons[key]) rows.push([rates.addons[key].label, await show(rates.addons[key].priceNgn)]);
-  if (b.pickupFee > 0) rows.push(["Pickup Fee", await show(b.pickupFee)]);
+  if (b.pickupFee > 0) rows.push([s.fixedPrice ? "Home Pickup" : "Pickup Fee", await show(b.pickupFee)]);
+  if (b.deliveryFee > 0) rows.push(["Home Delivery", await show(b.deliveryFee)]);
   if (b.packageCharges > 0) rows.push(["Package Handling (barrels etc.)", await show(b.packageCharges)]);
 
   return (

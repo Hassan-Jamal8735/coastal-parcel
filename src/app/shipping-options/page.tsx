@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { selectService } from "@/app/actions/booking-steps";
 import { BookingLayout, ShipnowStepper } from "@/components/booking-layout";
-import { SERVICE_TYPES, SITE_TIMEZONE } from "@/lib/constants";
+import { formatMoney, SERVICE_TYPES, SITE_TIMEZONE } from "@/lib/constants";
 import { calculateFinalPrice, deliveryEstimate, getPricingSettings } from "@/lib/pricing";
 import { requireAccessibleShipment } from "@/lib/shipments";
 
@@ -27,18 +27,24 @@ export default async function ShippingOptionsPage({ searchParams }: { searchPara
         </Link>
       </p>
       {error && <div className="auth-error">Please select a shipping option.</div>}
+      {s.fixedPrice && (
+        <div className="auth-notice">
+          {s.fixedPrice.label} &times; {s.fixedPrice.pieces} ships at a fixed price of {formatMoney(s.fixedPrice.freightUsd, "USD")} from {s.pickupCountry} to{" "}
+          {s.deliveryCountry}, whichever service you choose.
+        </div>
+      )}
 
       <form action={selectService.bind(null, s.id)}>
         <div className="shipnow-service-options">
           {Object.entries(SERVICE_TYPES).map(([key, label]) => {
-            const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: key, packageCharges: s.packageChargesNgn });
+            const b = calculateFinalPrice(rates, { weightKg: s.packageWeight, distanceKm: s.distanceKm ?? 0, fulfillment: s.fulfillment, serviceType: key, packageCharges: s.packageChargesNgn, fixed: s.fixedPrice, homeDelivery: s.homeDelivery });
             return (
               <label key={key} className="shipnow-service-option">
                 <input type="radio" name="service_type" value={key} defaultChecked={key === (s.serviceType || "door_to_door")} />
                 <div className="shipnow-service-option-body">
                   <div className="shipnow-service-option-header">
                     <span className="shipnow-service-option-name">{label}</span>
-                    <span className="shipnow-service-option-price">&#8358;{Math.round(b.basePrice + b.serviceAdjustment).toLocaleString("en-US")}</span>
+                    <span className="shipnow-service-option-price">&#8358;{Math.round(b.basePrice + b.serviceAdjustment + b.fixedFreight).toLocaleString("en-US")}</span>
                   </div>
                   <p className="shipnow-service-option-meta">Delivery in {deliveryEstimate(key, isDomestic)}</p>
                 </div>

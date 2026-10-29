@@ -26,6 +26,8 @@ async function reprice(s: Shipment, serviceType: string, addons: string[]) {
     serviceType,
     addons,
     packageCharges: s.packageChargesNgn,
+    fixed: s.fixedPrice,
+    homeDelivery: s.homeDelivery,
   });
 }
 

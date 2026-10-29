@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { confirmBooking } from "@/app/actions/booking-steps";
 import { BookingLayout } from "@/components/booking-layout";
-import { serviceLabel, weightBoth } from "@/lib/constants";
+import { formatMoney, serviceLabel, weightBoth } from "@/lib/constants";
 import { getPricingSettings, ngnRates } from "@/lib/pricing";
 import { requireAccessibleShipment } from "@/lib/shipments";
 import { CurrencyPreview } from "./currency-preview";
@@ -61,6 +61,14 @@ export default async function BookingPage({ searchParams }: { searchParams: Prom
       {s.packageChargesNgn > 0 && (
         <p>
           <strong>Package handling:</strong> &#8358;{fmt(s.packageChargesNgn)} <span className="p-light">(barrels and other package types)</span>
+        </p>
+      )}
+
+      {s.fixedPrice && (
+        <p>
+          <strong>Fixed price:</strong> {s.fixedPrice.label} &times; {s.fixedPrice.pieces} &mdash; {formatMoney(s.fixedPrice.freightUsd, "USD")}
+          {s.fulfillment === "pickup" && <> &middot; Home pickup {formatMoney(s.fixedPrice.pickupUsd, "USD")}</>}
+          {s.homeDelivery && <> &middot; Home delivery {formatMoney(s.fixedPrice.deliveryUsd, "USD")}</>}
         </p>
       )}
 

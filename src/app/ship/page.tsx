@@ -25,6 +25,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
     initial = {
       id: s.id,
       fulfillment: s.fulfillment as "dropoff" | "pickup",
+      homeDelivery: s.homeDelivery,
       shippingDate: s.shippingDate ?? "",
       isDocument: s.isDocument,
       senderName: s.senderName,
@@ -63,6 +64,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
     // A fresh shipment — prefilled from a /ship-now quote hand-off when present.
     initial = {
       fulfillment: q.fulfillment === "pickup" ? "pickup" : "dropoff",
+      homeDelivery: q.home_delivery === "1",
       shippingDate: new Date().toISOString().slice(0, 10),
       isDocument: false,
       senderName: user?.name ?? "",
@@ -100,6 +102,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
     };
   }
 
+  const rates = await getPricingSettings();
   return (
     <BookingLayout active="ship">
       {!initial.id && <ShipnowStepper current={1} />}
@@ -112,7 +115,7 @@ export default async function ShipPage({ searchParams }: { searchParams: Promise
       {!user && (
         <div className="auth-notice">You don&apos;t need an account to fill this in &mdash; check out as a guest, and create an account after paying if you&apos;d like to track it from a dashboard.</div>
       )}
-      <ShipForm initial={initial} isGuest={!user} packageCharges={(await getPricingSettings()).packageCharges} />
+      <ShipForm initial={initial} isGuest={!user} packageCharges={rates.packageCharges} fixedRoutes={rates.fixedRoutes} />
     </BookingLayout>
   );
 }

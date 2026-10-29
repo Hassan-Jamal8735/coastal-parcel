@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { shipmentPackages, shipments } from "@/db/schema";
 import { BOX_PRESETS, SHIPMENT_PURPOSES, toKg } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/dal";
-import { calculateFinalPrice, getPricingSettings, haversineKm, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
+import { calculateFinalPrice, fixedPriceFor, getPricingSettings, haversineKm, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
 import { aggregatePackages, canAccessShipment, getShipment, newGuestToken, setGuestCookie } from "@/lib/shipments";
 import { normalizePhone } from "@/lib/phone";
 
@@ -41,6 +41,7 @@ const shipmentSchema = z.object({
   // Weights arrive in the unit the customer chose and are stored in kg.
   weightUnit: z.enum(["kg", "lb"]).default("kg"),
   fulfillment: z.enum(["dropoff", "pickup"]).default("dropoff"),
+  homeDelivery: z.boolean().default(false),
   shippingDate: z.string().optional(),
   isDocument: z.boolean().default(false),
   senderName: z.string().trim().min(1, "Please enter the sender's name."),
@@ -108,19 +109,27 @@ export async function saveShipment(input: ShipmentInput): Promise<{ error: strin
     return data.isDocument ? { ...kg, length: null, width: null, height: null } : kg;
   });
   const totals = aggregatePackages(packages);
-  const fulfillment = existing?.fulfillment ?? data.fulfillment;
   const rates = await getPricingSettings(data.pickupCountry);
+  const route = { from: data.pickupCountry, to: data.deliveryCountry };
+  const fixedPrice = fixedPriceFor(rates, packages, route.from, route.to);
+  const fulfillment = data.fulfillment;
+  // Home delivery is a paid option only on fixed-price routes.
+  const homeDelivery = Boolean(fixedPrice) && data.homeDelivery;
   const price = calculateFinalPrice(rates, {
     weightKg: totals.packageWeight,
     distanceKm,
     fulfillment,
     serviceType: existing?.serviceType || undefined,
     addons: existing?.addons ?? [],
-    packageCharges: packageChargesNgn(rates, packages),
+    packageCharges: packageChargesNgn(rates, packages, route),
+    fixed: fixedPrice,
+    homeDelivery,
   });
 
   const values = {
     fulfillment,
+    homeDelivery,
+    fixedPrice,
     pricingMethod: data.pricingMethod,
     shippingDate: data.shippingDate || null,
     isDocument: data.isDocument,

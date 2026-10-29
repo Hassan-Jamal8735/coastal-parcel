@@ -9,7 +9,7 @@ import { contactMessages, settings, shipments, trackingEvents, users } from "@/d
 import { BOX_PRESETS, COUNTRIES, SHIPMENT_STATUS_LABELS } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { notifyCustomerStatusChange, notifyDriverAssigned, sendDriverDecision, sendStaffAccountCreated } from "@/lib/email";
-import { DEFAULT_PRICING } from "@/lib/pricing";
+import { DEFAULT_PRICING, getPricingSettings, type FixedRoute } from "@/lib/pricing";
 import { addTrackingEvent, getShipment } from "@/lib/shipments";
 
 /** Backoffice form handlers (WordPress inc/backoffice.php). Every one re-checks the staff/admin role. */
@@ -116,6 +116,44 @@ export async function boSavePackageCharges(formData: FormData) {
   await writePricing((v) => ({ ...v, packageCharges: charges }));
   redirect("/backoffice?panel=pricing&saved=1#packages");
 }
+
+/** Adds or updates the fixed price of one package type on one route (e.g. barrels US → Nigeria), in USD. */
+export async function boSaveFixedRoute(formData: FormData) {
+  await requireStaff();
+  const route = fixedRouteKey(formData);
+  if (!route) redirect("/backoffice?panel=pricing&error=route#fixed");
+  const usd: Record<string, number> = {};
+  for (const field of ["priceUsd", "pickupUsd", "deliveryUsd"]) {
+    const n = Number(formData.get(field));
+    if (formData.get(field) === "" || !Number.isFinite(n) || n < 0) redirect("/backoffice?panel=pricing&error=usd#fixed");
+    usd[field] = n;
+  }
+  const saved: FixedRoute = { ...route, priceUsd: usd.priceUsd, pickupUsd: usd.pickupUsd, deliveryUsd: usd.deliveryUsd };
+  // Start from the routes in effect, so the built-in US → Nigeria barrel price is kept until it's removed.
+  const current = (await getPricingSettings()).fixedRoutes.filter((r) => !sameRoute(r, route));
+  await writePricing((v) => ({ ...v, fixedRoutes: [...current, saved] }));
+  redirect("/backoffice?panel=pricing&saved=1#fixed");
+}
+
+export async function boRemoveFixedRoute(formData: FormData) {
+  await requireStaff();
+  const route = fixedRouteKey(formData);
+  const current = (await getPricingSettings()).fixedRoutes.filter((r) => !route || !sameRoute(r, route));
+  await writePricing((v) => ({ ...v, fixedRoutes: current }));
+  redirect("/backoffice?panel=pricing&saved=1#fixed");
+}
+
+function fixedRouteKey(formData: FormData) {
+  const packageType = String(formData.get("packageType") ?? "");
+  const from = String(formData.get("from") ?? "");
+  const to = String(formData.get("to") ?? "");
+  const countries = COUNTRIES as readonly string[];
+  if (!BOX_PRESETS.some((b) => b.key === packageType) || !countries.includes(from) || !countries.includes(to)) return null;
+  return { packageType, from, to };
+}
+
+type RouteKey = Pick<FixedRoute, "packageType" | "from" | "to">;
+const sameRoute = (a: RouteKey, b: RouteKey) => a.packageType === b.packageType && a.from === b.from && a.to === b.to;
 
 /** Adds or updates one country's own rates (used for shipments sent FROM that country). */
 export async function boSaveCountryRates(formData: FormData) {

@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { currencySymbol } from "@/lib/constants";
-import { basePriceNgn, convertNgnTo, getPricingSettings, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
+import { calculateFinalPrice, convertNgnTo, fixedPriceFor, getPricingSettings, LocationError, locationDistanceKm, packageChargesNgn } from "@/lib/pricing";
 
 const schema = z.object({
   pricingMethod: z.enum(["location", "mileage"]).default("location"),
@@ -11,9 +11,12 @@ const schema = z.object({
   destinationCity: z.string().optional(),
   destinationCountry: z.string().optional(),
   fulfillment: z.enum(["dropoff", "pickup"]).default("dropoff"),
+  homeDelivery: z.boolean().default(false),
   currency: z.string().default("NGN"),
   packageType: z.string().optional(),
   pieces: z.coerce.number().int().min(1).default(1),
+  // The ship form sends every package row; the quote form sends one packageType + pieces.
+  packages: z.array(z.object({ packageType: z.string().nullable().optional(), pieces: z.coerce.number().int().min(1), weightKg: z.coerce.number().nonnegative() })).optional(),
 });
 
 /** Live quote — same server-side formula used when a shipment is actually saved. */
@@ -44,10 +47,20 @@ export async function POST(request: Request) {
   }
 
   const rates = await getPricingSettings(input.originCountry);
-  let priceNgn = basePriceNgn(rates, input.weightKg, distanceKm);
-  if (input.fulfillment === "pickup") priceNgn += rates.pickupFeeNgn;
-  const handlingNgn = packageChargesNgn(rates, [{ packageType: input.packageType, pieces: input.pieces }]);
-  priceNgn += handlingNgn;
+  const packages = input.packages ?? [{ packageType: input.packageType, pieces: input.pieces, weightKg: input.weightKg / input.pieces }];
+  const countries = { from: input.originCountry ?? "", to: input.destinationCountry ?? "" };
+  // Same rule as saving the shipment: fixed route prices go by the two countries, whatever the pricing method.
+  const fixed = fixedPriceFor(rates, packages.map((p) => ({ ...p, weight: p.weightKg })), countries.from, countries.to);
+  const handlingNgn = packageChargesNgn(rates, packages, countries);
+  const price = calculateFinalPrice(rates, {
+    weightKg: input.weightKg,
+    distanceKm,
+    fulfillment: input.fulfillment,
+    packageCharges: handlingNgn,
+    fixed,
+    homeDelivery: input.homeDelivery,
+  });
+  const priceNgn = price.finalPrice;
   const currency = input.currency.toUpperCase();
 
   return Response.json({
@@ -60,6 +73,7 @@ export async function POST(request: Request) {
     ratePerKgNgn: rates.ratePerKgNgn,
     fulfillment: input.fulfillment,
     handlingNgn,
+    fixed,
     route,
   });
 }

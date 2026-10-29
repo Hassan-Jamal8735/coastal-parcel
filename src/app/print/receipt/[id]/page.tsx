@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { trackingEvents, users } from "@/db/schema";
 import { formatMoney, packageTypeLabel, serviceLabel, SHIPMENT_PURPOSES, SITE_TIMEZONE, weightBoth } from "@/lib/constants";
 import { barcodeSvg, canPrintShipment } from "@/lib/print";
-import { getPricingSettings } from "@/lib/pricing";
+import { fixedRouteFor, getPricingSettings } from "@/lib/pricing";
 import { getPackages, getShipment } from "@/lib/shipments";
 
 export const metadata = { title: "Receipt" };
@@ -96,11 +96,17 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             <tr>
               <td>
                 <strong>{serviceLabel(s.serviceType ?? "") || "Shipping"}</strong> shipping{s.fulfillment === "pickup" ? ", including pickup" : ""}
+                {s.homeDelivery ? `${s.fulfillment === "pickup" ? " and" : ", including"} home delivery` : ""}
                 <div className="receipt-sub">
                   {s.isDocument ? "Document" : "Package"} · {weightBoth(s.packageWeight)}
                   {s.distanceKm ? ` · ${Math.round(s.distanceKm).toLocaleString("en-US")} km` : ""}
                   {s.shipmentPurpose ? ` · ${SHIPMENT_PURPOSES[s.shipmentPurpose as keyof typeof SHIPMENT_PURPOSES] ?? s.shipmentPurpose}` : ""}
                 </div>
+                {s.fixedPrice && (
+                  <div className="receipt-sub">
+                    {s.fixedPrice.label} × {s.fixedPrice.pieces} at a fixed price of {formatMoney(s.fixedPrice.freightUsd, "USD")}
+                  </div>
+                )}
                 {packages.length > 1 && (
                   <div className="receipt-sub">
                     {packages.map((p) => `${p.pieces} × ${weightBoth(p.weight)}${p.description ? ` (${p.description})` : ""}`).join(" · ")}
@@ -112,7 +118,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             </tr>
             {s.packageChargesNgn > 0 &&
               packages
-                .filter((p) => p.packageType && rates.packageCharges[p.packageType])
+                .filter((p) => p.packageType && rates.packageCharges[p.packageType] && !fixedRouteFor(rates, p.packageType, s.pickupCountry, s.deliveryCountry))
                 .map((p) => (
                   <tr key={`pkg-${p.id}`}>
                     <td>{packageTypeLabel(p.packageType)} handling</td>
